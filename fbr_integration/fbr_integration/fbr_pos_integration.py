@@ -1,8 +1,11 @@
 import frappe
 from frappe import _
 from frappe.utils import cint, flt, cstr, getdate, get_time
-from pyqrcode import create as qrcreate
-import io
+from fbr_integration.fbr_integration.utils import (
+	get_invoice_qrcode_svg,
+	log_fbr_request,
+	get_item_pct_code,
+)
 import json
 import datetime
 import requests
@@ -402,29 +405,6 @@ def get_item_invoice_type(item, invoice, as_str=False):
 		return values[key]
 
 
-def get_item_pct_code(item):
-	if item.item_code:
-		pct_code = frappe.get_cached_value("Item", item.item_code, "customs_tariff_number")
-		if pct_code:
-			return pct_code
-		else:
-			return get_item_group_pct_code(frappe.get_cached_value("Item", item.item_code, "item_group"))
-	else:
-		return None
-
-
-def get_item_group_pct_code(item_group):
-	current_item_group = item_group
-	while current_item_group:
-		item_group_doc = frappe.get_cached_doc("Item Group", current_item_group)
-		if item_group_doc.customs_tariff_number:
-			return item_group_doc.customs_tariff_number
-
-		current_item_group = item_group_doc.parent_item_group
-
-	return None
-
-
 def get_item_tax_details(item, invoice, account):
 	if not account:
 		return frappe._dict()
@@ -475,7 +455,7 @@ def post_fbr_pos_invoice(invoice, ignore_connection_error=False):
 	invoice_number = push_invoice_data(invoice_data, invoice.name, ignore_connection_error=ignore_connection_error)
 
 	if invoice_number:
-		qrcode_svg = get_qrcode_svg(invoice_number)
+		qrcode_svg = get_invoice_qrcode_svg(invoice_number)
 
 		invoice.db_set({
 			'fbr_pos_invoice_no': invoice_number,
@@ -516,97 +496,47 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 		response_html = "<br><br>{0}".format(response_message) if response_message else ""
 
 		if errors:
-			log_fbr_pos_request("Error", sales_invoice, data, invoice_number, r, error_type="FBR POS Error")
+			log_fbr_request("Failed", sales_invoice, data, invoice_number, r, error_type="FBR POS Error")
 			frappe.throw(_("An error occurred while generating <b>FBR POS Invoice</b>:<br>{0}{1}")
 				.format(errors, response_html), exc=FBRPOSResponseError)
 
 		if response_code != '100':
-			log_fbr_pos_request("Error", sales_invoice, data, invoice_number, r, error_type="Invalid Response Code")
+			log_fbr_request("Failed", sales_invoice, data, invoice_number, r, error_type="Invalid Response Code")
 			frappe.throw(_("Received an invalid response while generating <b>FBR POS Invoice</b>{0}")
 				.format(response_html), exc=FBRPOSResponseError)
 
 		if not invoice_number or invoice_number == 'Not Available':
-			log_fbr_pos_request("Error", sales_invoice, data, invoice_number, r, error_type="Invoice Number Not Available")
+			log_fbr_request("Failed", sales_invoice, data, invoice_number, r, error_type="Invoice Number Not Available")
 			frappe.throw(_("FBR POS Invoice Number was not provided by <b>FBR POS Service</b>"), exc=FBRPOSResponseError)
 
 	except requests.exceptions.ConnectionError as err:
-		log_fbr_pos_request("Error", sales_invoice, data, invoice_number, error_type="Connection Error")
+		log_fbr_request("Failed", sales_invoice, data, invoice_number, error_type="Connection Error")
 		frappe.flags.fbr_pos_connection_error = True
 		if not ignore_connection_error:
 			frappe.throw(_("Could not connect to <b>FBR POS Service</b>:<br>{0}").format(err), exc=FBRPOSConnectionError)
 
 	except requests.exceptions.Timeout as err:
-		log_fbr_pos_request("Error", sales_invoice, data, invoice_number, error_type="Connection Timeout")
+		log_fbr_request("Failed", sales_invoice, data, invoice_number, error_type="Connection Timeout")
 		frappe.flags.fbr_pos_connection_error = True
 		if not ignore_connection_error:
 			frappe.throw(_("Connection to <b>FBR POS Service</b> timed out:<br>{0}").format(err), exc=FBRPOSConnectionError)
 
 	except requests.exceptions.HTTPError as err:
-		log_fbr_pos_request("Error", sales_invoice, data, invoice_number, error_type="HTTP Error")
+		log_fbr_request("Failed", sales_invoice, data, invoice_number, error_type="HTTP Error")
 		frappe.flags.fbr_pos_connection_error = True
 		if not ignore_connection_error:
 			frappe.throw(_("An HTTP error occurred while connecting to the <b>FBR POS Service</b>:<br>{0}").format(err), exc=FBRPOSConnectionError)
 
 	except requests.exceptions.RequestException as err:
-		log_fbr_pos_request("Error", sales_invoice, data, invoice_number, error_type="Request Error")
+		log_fbr_request("Failed", sales_invoice, data, invoice_number, error_type="Request Error")
 		frappe.flags.fbr_pos_connection_error = True
 		if not ignore_connection_error:
 			frappe.throw(_("Request to <b>FBR POS Service</b> failed:<br>{0}").format(err), exc=FBRPOSConnectionError)
 
 	else:
-		log_fbr_pos_request("Success", sales_invoice, data, invoice_number, r)
+		log_fbr_request("Completed", sales_invoice, data, invoice_number, r)
 
 	return invoice_number
-
-
-def get_qrcode_svg(invoice_number):
-	qrcode = qrcreate(invoice_number)
-	svg = ''
-	stream = io.BytesIO()
-	try:
-		qrcode.svg(stream, scale=2, background="#fff", module_color="#000", quiet_zone=1, omithw=True)
-		svg = stream.getvalue().decode().replace('\n', '')
-	finally:
-		stream.close()
-
-	return svg
-
-
-def log_fbr_pos_request(log_type, sales_invoice, invoice_data,
-		fbr_pos_invoice_no=None, response=None, error_type=None):
-	if isinstance(invoice_data, dict):
-		invoice_data = json.dumps(invoice_data)
-
-	request_timestamp = frappe.utils.now_datetime()
-
-	error = None
-	if log_type == "Error":
-		error = frappe.as_unicode(frappe.get_traceback())
-
-	frappe.enqueue(insert_fbr_pos_log,
-		log_type=log_type, sales_invoice=sales_invoice, invoice_data=invoice_data,
-		fbr_pos_invoice_no=fbr_pos_invoice_no,
-		response_json=response.text if response else None,
-		response_status_code=response.status_code if response else None,
-		request_timestamp=request_timestamp,
-		error_type=error_type, error=error)
-
-
-def insert_fbr_pos_log(log_type, sales_invoice, invoice_data,
-		fbr_pos_invoice_no=None, response_json=None, response_status_code=None, request_timestamp=None,
-		error=None, error_type=None):
-	log_doc = frappe.new_doc("FBR POS Log")
-	log_doc.log_type = log_type
-	log_doc.sales_invoice = sales_invoice
-	log_doc.invoice_data = invoice_data
-	log_doc.fbr_pos_invoice_no = fbr_pos_invoice_no or None
-	log_doc.response = response_json
-	log_doc.response_status_code = response_status_code
-	log_doc.request_timestamp = request_timestamp or frappe.utils.now_datetime()
-	log_doc.error = error
-	log_doc.error_type = error_type
-
-	log_doc.insert(ignore_permissions=True)
 
 
 def get_error_title(invoice_name):

@@ -1,4 +1,5 @@
 [pre_model_sync]
+fbr_integration.patches.move_fbr_pos_log_to_integration_request
 
 
 [post_model_sync]

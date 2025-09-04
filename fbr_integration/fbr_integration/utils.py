@@ -105,3 +105,13 @@ def insert_request_log(
 	log_doc.request_description = error_type or None
 
 	log_doc.insert(ignore_permissions=True)
+
+
+def remove_fbr_fields(custom_fields_map):
+	for dt, custom_fields in custom_fields_map.items():
+		for custom_field_detail in custom_fields:
+			custom_field_name = frappe.db.get_value('Custom Field', {
+				"dt": dt, "fieldname": custom_field_detail.get('fieldname')
+			})
+			if custom_field_name:
+				frappe.delete_doc('Custom Field', custom_field_name, delete_permanently=True)

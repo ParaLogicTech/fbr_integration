@@ -37,6 +37,7 @@ fixtures = [
 		"filters": {
 			"name": ["in", [
 				"Sales Invoice-fbr_pos_details_tab",
+				"Sales Invoice-fbr_di_details_tab",
 				"Item Group-customs_tariff_number",
 			]]
 		},

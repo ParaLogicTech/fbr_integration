@@ -6,7 +6,7 @@ from frappe import _
 from frappe.utils import cint
 from frappe.model.document import Document
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
-from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+from fbr_integration.fbr_integration.utils import remove_fbr_fields
 
 
 invoice_custom_fields = [
@@ -14,13 +14,13 @@ invoice_custom_fields = [
 	{"label": "FBR POS InvoiceNumber", "fieldname": "fbr_pos_invoice_no", "fieldtype": "Data",
 		"insert_after": "stin", "read_only": 1, "no_copy": 1, "search_index": 1},
 	{"label": "Is FBR POS Invoice", "fieldname": "is_fbr_pos_invoice", "fieldtype": "Check",
-		"insert_after": "has_stin", "default": 1, "read_only": 1, "no_copy": 1, "in_standard_filter": 1,
+		"insert_after": "has_stin", "default": 0, "read_only": 1, "no_copy": 1, "in_standard_filter": 1,
 		"search_index": 1, "depends_on": "eval:doc.has_stin && !doc.fbr_pos_invoice_no"},
 
 	# In FBR POS Transaction Details Tab
 	{"labeL": "FBR POS Transaction Details", "fieldname": "sec_fbr_pos_transaction_details",
 		"insert_after": "fbr_pos_details_tab", "fieldtype": "Section Break",
-		"depends_on": "eval:doc.has_stin && doc.is_fbr_pos_invoice"},
+		"depends_on": "eval:doc.is_fbr_pos_invoice"},
 	{"label": "FBR POSID", "fieldname": "fbr_pos_id", "fieldtype": "Int",
 		"insert_after": "sec_fbr_pos_transaction_details", "no_copy": 1},
 	{"label": "FBR POS InvoiceType", "fieldname": "fbr_pos_invoice_type", "fieldtype": "Data",
@@ -62,7 +62,7 @@ invoice_custom_fields = [
 	# FBR POS Item Details Section
 	{"label": "FBR POS Item Details", "fieldname": "sec_fbr_pos_item_details", "fieldtype": "Section Break",
 		"insert_after": "fbr_pos_json_data", "collapsible": 0,
-		"depends_on": "eval:doc.has_stin && doc.is_fbr_pos_invoice"},
+		"depends_on": "eval:doc.is_fbr_pos_invoice"},
 
 	{"label": "FBR POS Items", "fieldname": "fbr_pos_items", "fieldtype": "Table",
 		"options": "FBR POS Invoice Item",
@@ -98,18 +98,7 @@ def disable_fbr_pos():
 	meta = frappe.get_meta("Sales Invoice")
 	if meta.has_field('is_fbr_pos_invoice'):
 		if can_remove_fbr_pos_fields():
-			remove_fbr_pos_fields()
-		else:
-			make_property_setter("Sales Invoice", "is_fbr_pos_invoice", "default", 0, "Check")
-
-
-def remove_fbr_pos_fields():
-	for dt, custom_fields in custom_fields_map.items():
-		for custom_field_detail in custom_fields:
-			custom_field_name = frappe.db.get_value('Custom Field',
-				dict(dt=dt, fieldname=custom_field_detail.get('fieldname')))
-			if custom_field_name:
-				frappe.delete_doc('Custom Field', custom_field_name)
+			remove_fbr_fields(custom_fields_map)
 
 
 def can_remove_fbr_pos_fields():

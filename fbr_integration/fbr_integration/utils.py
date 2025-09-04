@@ -3,6 +3,18 @@ import io
 import json
 
 
+class FBRRequestError(frappe.ValidationError):
+	pass
+
+
+class FBRConnectionError(FBRRequestError):
+	pass
+
+
+class FBRResponseError(FBRRequestError):
+	pass
+
+
 def get_item_pct_code(item):
 	if item.item_code:
 		pct_code = frappe.get_cached_value("Item", item.item_code, "customs_tariff_number")

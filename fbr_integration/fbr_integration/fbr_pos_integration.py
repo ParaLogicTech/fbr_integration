@@ -487,27 +487,27 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 		response_html = "<br><br>{0}".format(response_message) if response_message else ""
 
 		if errors:
-			log_fbr_request("Failed", sales_invoice, data, invoice_number, r,
+			log_fbr_pos_request("Failed", sales_invoice, data, invoice_number, r,
 				error_type="FBR POS Error")
 			frappe.throw(_("An error occurred while generating <b>FBR POS Invoice</b>:<br>{0}{1}").format(
 				errors, response_html
 			), exc=FBRResponseError)
 
 		if response_code != '100':
-			log_fbr_request("Failed", sales_invoice, data, invoice_number, r,
+			log_fbr_pos_request("Failed", sales_invoice, data, invoice_number, r,
 				error_type="Invalid Response Code")
 			frappe.throw(_("Received an invalid response while generating <b>FBR POS Invoice</b>{0}").format(
 				response_html
 			), exc=FBRResponseError)
 
 		if not invoice_number or invoice_number == 'Not Available':
-			log_fbr_request("Failed", sales_invoice, data, invoice_number, r,
+			log_fbr_pos_request("Failed", sales_invoice, data, invoice_number, r,
 				error_type="Invoice Number Not Available")
 			frappe.throw(_("FBR POS Invoice Number was not provided by <b>FBR POS Service</b>"),
 				exc=FBRResponseError)
 
 	except requests.exceptions.ConnectionError as err:
-		log_fbr_request("Failed", sales_invoice, data, invoice_number,
+		log_fbr_pos_request("Failed", sales_invoice, data, invoice_number,
 			error_type="Connection Error")
 		frappe.flags.fbr_pos_connection_error = True
 		if not ignore_connection_error:
@@ -516,7 +516,7 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 			), exc=FBRConnectionError)
 
 	except requests.exceptions.Timeout as err:
-		log_fbr_request("Failed", sales_invoice, data, invoice_number,
+		log_fbr_pos_request("Failed", sales_invoice, data, invoice_number,
 			error_type="Connection Timeout")
 		frappe.flags.fbr_pos_connection_error = True
 		if not ignore_connection_error:
@@ -525,7 +525,7 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 			), exc=FBRConnectionError)
 
 	except requests.exceptions.HTTPError as err:
-		log_fbr_request("Failed", sales_invoice, data, invoice_number,
+		log_fbr_pos_request("Failed", sales_invoice, data, invoice_number,
 			error_type="HTTP Error")
 		frappe.flags.fbr_pos_connection_error = True
 		if not ignore_connection_error:
@@ -534,7 +534,7 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 			), exc=FBRConnectionError)
 
 	except requests.exceptions.RequestException as err:
-		log_fbr_request("Failed", sales_invoice, data, invoice_number,
+		log_fbr_pos_request("Failed", sales_invoice, data, invoice_number,
 			error_type="Request Error")
 		frappe.flags.fbr_pos_connection_error = True
 		if not ignore_connection_error:
@@ -543,9 +543,28 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 			), exc=FBRConnectionError)
 
 	else:
-		log_fbr_request("Completed", sales_invoice, data, invoice_number, r)
+		log_fbr_pos_request("Completed", sales_invoice, data, invoice_number, r)
 
 	return invoice_number
+
+
+def log_fbr_pos_request(
+	status,
+	sales_invoice,
+	data,
+	invoice_number=None,
+	response=None,
+	error_type=None,
+):
+	return log_fbr_request(
+		service="FBR POS",
+		status=status,
+		sales_invoice=sales_invoice,
+		data=data,
+		invoice_number=invoice_number,
+		response=response,
+		error_type=error_type,
+	)
 
 
 def get_error_title(invoice_name):

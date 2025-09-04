@@ -47,14 +47,14 @@
   },
   {
    "fieldname": "post_invoice_auth_token",
-   "fieldtype": "Small Text",
+   "fieldtype": "Password",
    "label": "Authorization Token"
   }
  ],
  "grid_page_length": 500,
  "issingle": 1,
  "links": [],
- "modified": "2025-09-04 15:00:02.924027",
+ "modified": "2025-09-04 20:56:47.863692",
  "modified_by": "Administrator",
  "module": "FBR Integration",
  "name": "FBR POS Settings",

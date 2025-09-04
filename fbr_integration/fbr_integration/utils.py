@@ -53,6 +53,7 @@ def get_invoice_qrcode_svg(invoice_number):
 
 
 def log_fbr_request(
+	service,
 	status,
 	sales_invoice,
 	data,
@@ -69,17 +70,19 @@ def log_fbr_request(
 
 	frappe.enqueue(
 		insert_request_log,
+		service=service,
 		status=status,
 		sales_invoice=sales_invoice,
 		invoice_data=data,
 		fbr_pos_invoice_no=invoice_number,
 		response_json=response.text if response else None,
 		error_type=error_type,
-		error=error
+		error=error,
 	)
 
 
 def insert_request_log(
+	service,
 	status,
 	sales_invoice,
 	data,
@@ -89,6 +92,7 @@ def insert_request_log(
 	error_type=None,
 ):
 	log_doc = frappe.new_doc("Integration Request")
+	log_doc.integration_request_service = service
 	log_doc.status = status
 
 	log_doc.reference_doctype = "Sales Invoice"

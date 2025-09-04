@@ -69,12 +69,6 @@ invoice_custom_fields = [
 		"insert_after": "sec_fbr_pos_item_details", "read_only": 1, "no_copy": 1},
 ]
 
-item_group_custom_fields = [
-	{"label": "PCT Code (Customs Tariff Number)", "fieldname": "customs_tariff_number", "fieldtype": "Link",
-		"options": "Customs Tariff Number",
-		"insert_after": "taxes"},
-]
-
 custom_fields_map = {
 	'Sales Invoice': invoice_custom_fields,
 }

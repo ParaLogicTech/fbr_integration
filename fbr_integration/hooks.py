@@ -10,12 +10,15 @@ required_apps = ["ParaLogicTech/erpnext"]
 doc_events = {
 	"Sales Invoice": {
 		"validate": [
+			"fbr_integration.fbr_integration.fbr_di_integration.validate_fbr_di_invoice",
 			"fbr_integration.fbr_integration.fbr_pos_integration.validate_fbr_pos_invoice",
 		],
 		"on_submit": [
+			"fbr_integration.fbr_integration.fbr_di_integration.on_submit_fbr_di_invoice",
 			"fbr_integration.fbr_integration.fbr_pos_integration.on_submit_fbr_pos_invoice",
 		],
 		"before_cancel": [
+			"fbr_integration.fbr_integration.fbr_di_integration.before_cancel_fbr_di_invoice",
 			"fbr_integration.fbr_integration.fbr_pos_integration.before_cancel_fbr_pos_invoice",
 		],
 	}
@@ -26,7 +29,8 @@ doctype_js = {
 }
 
 scheduler_events = {
-	"hourly": [
+	"hourly_long": [
+		"fbr_integration.fbr_integration.fbr_di_integration.post_fbr_di_invoices_without_number",
 		"fbr_integration.fbr_integration.fbr_pos_integration.post_fbr_pos_invoices_without_number",
 	]
 }

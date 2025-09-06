@@ -20,8 +20,10 @@ invoice_custom_fields = [
 	# In FBR Digital Invoicing Transaction Details Tab
 	{"label": "FBR DI Invoice Type", "fieldname": "fbr_di_invoice_type", "fieldtype": "Data",
 		"insert_after": "fbr_di_details_tab", "read_only": 1, "no_copy": 1},
-	{"label": "FBR DI Buyer Registration Type", "fieldname": "fbr_di_buyer_registration_type", "fieldtype": "Data",
+	{"label": "FBR DI Invoice Ref No", "fieldname": "fbr_di_invoice_ref_no", "fieldtype": "Data",
 		"insert_after": "fbr_di_invoice_type", "read_only": 1, "no_copy": 1},
+	{"label": "FBR DI Buyer Registration Type", "fieldname": "fbr_di_buyer_registration_type", "fieldtype": "Data",
+		"insert_after": "fbr_di_invoice_ref_no", "read_only": 1, "no_copy": 1},
 
 	{"label": "", "fieldname": "cb_fbr_di_1", "fieldtype": "Column Break",
 		"insert_after": "fbr_di_buyer_registration_type"},

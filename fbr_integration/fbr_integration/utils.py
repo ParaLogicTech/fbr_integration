@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 import io
 import json
 
@@ -15,18 +16,20 @@ class FBRResponseError(FBRRequestError):
 	pass
 
 
-def get_item_pct_code(item):
-	if item.item_code:
+def get_item_hs_code(item):
+	if item.get("customs_tariff_number"):
+		return item.customs_tariff_number
+	elif item.item_code:
 		pct_code = frappe.get_cached_value("Item", item.item_code, "customs_tariff_number")
 		if pct_code:
 			return pct_code
 		else:
-			return get_item_group_pct_code(frappe.get_cached_value("Item", item.item_code, "item_group"))
+			return get_item_group_hs_code(frappe.get_cached_value("Item", item.item_code, "item_group"))
 	else:
-		return None
+		return ""
 
 
-def get_item_group_pct_code(item_group):
+def get_item_group_hs_code(item_group):
 	current_item_group = item_group
 	while current_item_group:
 		item_group_doc = frappe.get_cached_doc("Item Group", current_item_group)
@@ -35,7 +38,22 @@ def get_item_group_pct_code(item_group):
 
 		current_item_group = item_group_doc.parent_item_group
 
-	return None
+	return ""
+
+
+def get_item_tax_details(item, invoice, account):
+	if not account:
+		return frappe._dict()
+
+	taxes = invoice.get_taxes_for_item(item)
+	tax_row = [d for d in taxes if d.account_head == account]
+
+	if not tax_row:
+		return frappe._dict()
+	elif len(tax_row) > 1:
+		frappe.throw(_("Row #{0}: Tax Account {1} is duplicated").format(tax_row[-1].idx, account))
+
+	return tax_row[0]
 
 
 def get_invoice_qrcode_svg(invoice_number):
@@ -54,6 +72,7 @@ def get_invoice_qrcode_svg(invoice_number):
 
 def log_fbr_request(
 	service,
+	url,
 	status,
 	sales_invoice,
 	data,
@@ -71,10 +90,11 @@ def log_fbr_request(
 	frappe.enqueue(
 		insert_request_log,
 		service=service,
+		url=url,
 		status=status,
 		sales_invoice=sales_invoice,
-		invoice_data=data,
-		fbr_pos_invoice_no=invoice_number,
+		data=data,
+		invoice_number=invoice_number,
 		response_json=response.text if response else None,
 		error_type=error_type,
 		error=error,
@@ -83,6 +103,7 @@ def log_fbr_request(
 
 def insert_request_log(
 	service,
+	url,
 	status,
 	sales_invoice,
 	data,
@@ -93,6 +114,7 @@ def insert_request_log(
 ):
 	log_doc = frappe.new_doc("Integration Request")
 	log_doc.integration_request_service = service
+	log_doc.url = url
 	log_doc.status = status
 
 	log_doc.reference_doctype = "Sales Invoice"

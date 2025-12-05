@@ -348,7 +348,7 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 
 		# Parent Level Error Message
 		if parent_error_message or parent_error_code:
-			log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number, r,
+			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
 				error_type="FBR DI Error")
 			frappe.throw(_("An error occurred while generating <b>FBR Digital Invoice</b>:<br>{0}").format(
 				parent_error_message or parent_error_code
@@ -363,14 +363,14 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 			child_error_code = child_response.get('error_code')
 
 			if child_error_message or child_error_code:
-				log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number, r,
+				log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
 					error_type="FBR DI Error")
 				frappe.throw(_("An error occurred while generating <b>FBR Digital Invoice</b>:<br>FBR DI Row #{0}: {1}").format(
 					child_idx, child_error_message or child_error_code
 				), exc=FBRResponseError)
 
 			if child_status_code != '00':
-				log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number, r,
+				log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
 					error_type="Invalid Response Code")
 				frappe.throw(_("Received an invalid response while generating <b>FBR Digital Invoice</b> on FBR DI Row #{0}").format(
 					child_idx
@@ -378,20 +378,20 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 
 		# Parent Level Invalid Status Code
 		if parent_status_code != '00':
-			log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number, r,
+			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
 				error_type="Invalid Response Code")
 			frappe.throw(_("Received an invalid response while generating <b>FBR Digital Invoice</b>"),
 				exc=FBRResponseError)
 
 		# Missing Invoice Number
 		if not invoice_number or invoice_number == 'Not Available':
-			log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number, r,
+			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
 				error_type="Invoice Number Not Available")
 			frappe.throw(_("FBR Digital Invoice Number was not provided by <b>FBR Digital Invoicing Service</b>"),
 				exc=FBRResponseError)
 
 	except requests.exceptions.ConnectionError as err:
-		log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number,
+		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
 			error_type="Connection Error")
 		frappe.flags.fbr_di_connection_error = True
 		if not ignore_connection_error:
@@ -400,7 +400,7 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 			), exc=FBRConnectionError)
 
 	except requests.exceptions.Timeout as err:
-		log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number,
+		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
 			error_type="Connection Timeout")
 		frappe.flags.fbr_di_connection_error = True
 		if not ignore_connection_error:
@@ -409,21 +409,21 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 			), exc=FBRConnectionError)
 
 	except requests.exceptions.HTTPError as err:
-		log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number,
+		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
 			error_type="HTTP Error")
 		frappe.throw(_("An HTTP error occurred while connecting to the <b>FBR Digital Invoicing Service</b>:<br>{0}").format(
 			err
 		), exc=FBRRequestError)
 
 	except requests.exceptions.RequestException as err:
-		log_fbr_di_request("Failed", url, sales_invoice, data, invoice_number,
+		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
 			error_type="Request Error")
 		frappe.throw(_("Request to <b>FBR Digital Invoicing Service</b> failed:<br>{0}").format(
 			err
 		), exc=FBRRequestError)
 
 	else:
-		log_fbr_di_request("Completed", url, sales_invoice, data, invoice_number, r)
+		log_fbr_di_request("Completed", sales_invoice, data, invoice_number, r)
 
 	return invoice_number
 
@@ -494,7 +494,6 @@ def format_address(address):
 
 def log_fbr_di_request(
 	status,
-	url,
 	sales_invoice,
 	data,
 	invoice_number=None,
@@ -503,7 +502,6 @@ def log_fbr_di_request(
 ):
 	return log_fbr_request(
 		service="FBR DI",
-		url=url,
 		status=status,
 		sales_invoice=sales_invoice,
 		data=data,

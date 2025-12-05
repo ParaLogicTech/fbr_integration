@@ -14,6 +14,9 @@ import json
 import requests
 
 
+DEFAULT_UOM = "Numbers, pieces, units"
+
+
 def validate_fbr_di_invoice(invoice, method=None):
 	if not invoice.meta.has_field('is_fbr_di_invoice'):
 		return
@@ -166,8 +169,9 @@ def calculate_fbr_di_values(invoice):
 		di_item.fbr_di_sale_type = get_item_sale_type(item)
 
 		# Qty / Amounts
-		di_item.fbr_di_quantity = flt(item.qty, di_item.precision('fbr_di_quantity'))
-		di_item.fbr_di_uom = get_item_uom(item)
+		qty, uom = get_item_qty_and_uom(item)
+		di_item.fbr_di_quantity = flt(qty, di_item.precision('fbr_di_quantity'))
+		di_item.fbr_di_uom = uom
 		di_item.fbr_di_sale_value = flt(item.base_net_amount, di_item.precision('fbr_di_sale_value'))
 		di_item.fbr_di_retail_value = flt(item.base_taxable_amount, di_item.precision('fbr_di_retail_value')) if cint(item.apply_taxes_on_retail) else 0
 		di_item.fbr_di_discount = flt(item.base_tax_exclusive_total_discount, di_item.precision('fbr_di_discount'))
@@ -446,9 +450,21 @@ def get_item_sale_type(item):
 		return "Goods at standard rate (default)"
 
 
-def get_item_uom(item):
-	# todo more specific
-	return "Numbers, pieces, units"
+def get_item_qty_and_uom(item):
+	qty = flt(item.qty)
+	use_uom = item.uom
+	if not use_uom:
+		return qty, DEFAULT_UOM
+
+	uom_doc = frappe.get_cached_doc("UOM", use_uom)
+	if uom_doc.fbr_use_alt_uom:
+		qty = flt(item.alt_uom_qty)
+		alt_uom = item.alt_uom or item.uom
+		if alt_uom:
+			use_uom = alt_uom
+			uom_doc = frappe.get_cached_doc("UOM", use_uom)
+
+	return qty, uom_doc.fbr_uom or DEFAULT_UOM
 
 
 def get_province_from_address(address):

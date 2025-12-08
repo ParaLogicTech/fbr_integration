@@ -35,6 +35,14 @@ scheduler_events = {
 	]
 }
 
+transaction_controller_init = [
+	"fbr_integration.overrides.item_details_hooks.transaction_controller_init_hook",
+]
+
+get_item_tax_template_details = [
+	"fbr_integration.overrides.item_details_hooks.get_item_tax_template_details_hook",
+]
+
 fixtures = [
 	{
 		"doctype": "Custom Field",
@@ -47,6 +55,13 @@ fixtures = [
 
 				"UOM-fbr_uom",
 				"UOM-fbr_use_alt_uom",
+
+				"Item Tax Template-sec_fbr",
+				"Item Tax Template-fbr_sales_tax_type",
+				"Item Tax Template-cb_fbr_1",
+				"Item Tax Template-fbr_sro_schedule_no",
+				"Item Tax Template-cb_fbr_2",
+				"Item Tax Template-fbr_sro_serial_no",
 			]]
 		},
 	},

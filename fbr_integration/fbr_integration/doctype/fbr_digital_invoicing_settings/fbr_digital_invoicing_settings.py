@@ -49,8 +49,18 @@ invoice_custom_fields = [
 		"insert_after": "sec_fbr_di_item_details", "read_only": 1, "no_copy": 1},
 ]
 
+invoice_item_custom_fields = [
+	{"label": "FBR Sales Tax Type", "fieldname": "fbr_sales_tax_type", "fieldtype": "Data",
+		"insert_after": "item_tax_template", "read_only": 1},
+	{"label": "SRO Schedule No", "fieldname": "fbr_sro_schedule_no", "fieldtype": "Data",
+		"insert_after": "fbr_sales_tax_type", "read_only": 1},
+	{"label": "SRO Serial No", "fieldname": "fbr_sro_serial_no", "fieldtype": "Data",
+		"insert_after": "fbr_sro_schedule_no", "read_only": 1},
+]
+
 custom_fields_map = {
 	'Sales Invoice': invoice_custom_fields,
+	'Sales Invoice Item': invoice_item_custom_fields,
 }
 
 for d in invoice_custom_fields:

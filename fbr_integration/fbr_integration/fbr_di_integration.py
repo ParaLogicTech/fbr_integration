@@ -223,8 +223,8 @@ def calculate_fbr_di_values(invoice):
 			di_item.fbr_di_total_value *= -1
 
 		# Additional
-		di_item.fbr_di_sro_schedule_no = ""
-		di_item.fbr_di_sro_serial_no = ""
+		di_item.fbr_di_sro_schedule_no = item.fbr_sro_schedule_no
+		di_item.fbr_di_sro_serial_no = item.fbr_sro_serial_no
 
 		# Remove if no tax
 		if (
@@ -232,6 +232,7 @@ def calculate_fbr_di_values(invoice):
 			and not di_item.fbr_di_sales_tax
 			and not di_item.fbr_di_further_tax
 			and not di_item.fbr_di_extra_tax
+			and di_item.fbr_di_sale_type not in ("Goods at zero-rate", "Exempt goods")
 		):
 			invoice.remove(di_item)
 
@@ -280,10 +281,14 @@ def get_invoice_data(invoice):
 		item_data.valueSalesExcludingST = flt(di_item.fbr_di_sale_value)
 		item_data.fixedNotifiedValueOrRetailPrice = flt(di_item.fbr_di_retail_value)
 
-		item_data.rate = di_item.get_formatted("fbr_di_tax_rate")
+		if not di_item.fbr_di_sales_tax and di_item.fbr_di_sale_type == "Exempt goods":
+			item_data.rate = "Exempt"
+		else:
+			item_data.rate = di_item.get_formatted("fbr_di_tax_rate")
+
 		item_data.salesTaxApplicable = flt(di_item.fbr_di_sales_tax)
 		item_data.salesTaxWithheldAtSource = flt(di_item.fbr_di_sales_tax_withheld)
-		item_data.extraTax = flt(di_item.fbr_di_extra_tax)
+		item_data.extraTax = flt(di_item.fbr_di_extra_tax) or ""
 		item_data.furtherTax = flt(di_item.fbr_di_further_tax)
 		item_data.fedPayable = flt(di_item.fbr_di_fed_tax)
 
@@ -294,6 +299,9 @@ def get_invoice_data(invoice):
 		item_data.sroScheduleNo = di_item.fbr_di_sro_schedule_no
 		item_data.sroItemSerialNo = di_item.fbr_di_sro_serial_no
 		item_data.saleType = di_item.fbr_di_sale_type
+
+	if cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "use_sandbox")):
+		invoice_data["scenarioId"] = get_sandbox_scenario_id(invoice_data, invoice)
 
 	return invoice_data
 
@@ -338,7 +346,6 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 
 	if fbr_di_settings.use_sandbox:
 		url = "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb"
-		data["scenarioId"] = get_sandbox_scenario_id(data)
 	else:
 		url = "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata"
 
@@ -444,18 +451,20 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 
 
 def get_invoice_type_and_ref(invoice):
-	invoice_ref_no = ""
 	if cint(invoice.is_return):
+		invoice_ref_no = ""
 		if invoice.return_against:
 			invoice_ref_no = frappe.db.get_value("Sales Invoice", invoice.return_against, "fbr_di_invoice_no", cache=True)
 
 		return 'Credit Note', invoice_ref_no
 	else:
-		return 'Sale Invoice', invoice_ref_no
+		return 'Sale Invoice', invoice.name
 
 
 def get_item_sale_type(item):
-	if item.apply_taxes_on_retail:
+	if item.get("fbr_sales_tax_type"):
+		return item.get("fbr_sales_tax_type")
+	elif item.apply_taxes_on_retail:
 		return " 3rd Schedule Goods "
 	else:
 		return "Goods at standard rate (default)"
@@ -485,18 +494,43 @@ def get_province_from_address(address):
 	return frappe.db.get_value("Address", address, "state", cache=True)
 
 
-def get_sandbox_scenario_id(data):
-	scenario_id = ""
+def get_sandbox_scenario_id(data, invoice):
+	if any(d.get("saleType") == "Goods at zero-rate" for d in data.get("items")):
+		return "SN007"
 
-	if any(d.get("saleType") == " 3rd Schedule Goods " for d in data.get("items")):
-		return "SN008"
+	elif any(d.get("saleType") == "Exempt goods" for d in data.get("items")):
+		return "SN006"
+
+	elif any(d.get("saleType") == "Processing/Conversion of Goods" for d in data.get("items")):
+		return "SN016"
+
+	elif any(d.get("saleType") == "Goods (FED in ST Mode)" for d in data.get("items")):
+		return "SN017"
+
+	elif any(d.get("saleType") == "Goods as per SRO.297(|)/2023" for d in data.get("items")):
+		return "SN024"
+
+	elif any(d.get("saleType") == " 3rd Schedule Goods " for d in data.get("items")):
+		if invoice.get("is_pos"):
+			return "SN027"
+		else:
+			return "SN008"
+
+	elif any(d.get("saleType") == "Goods at Reduced Rate" for d in data.get("items")):
+		if invoice.get("is_pos"):
+			return "SN028"
+		else:
+			return "SN005"
+
 	elif any(d.get("saleType") == "Goods at standard rate (default)" for d in data.get("items")):
-		if data.get("buyerRegistrationType") == "Registered":
-			scenario_id = "SN001"
+		if invoice.get("is_pos"):
+			return "SN026"
+		elif data.get("buyerRegistrationType") == "Registered":
+			return "SN001"
 		elif data.get("buyerRegistrationType") == "Unregistered":
-			scenario_id = "SN002"
+			return "SN002"
 
-	return scenario_id
+	return ""
 
 
 def format_ntn_cnic(ntn=None, cnic=None):

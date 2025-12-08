@@ -190,6 +190,17 @@ def calculate_fbr_di_values(invoice):
 		di_item.fbr_di_further_tax = flt(further_tax_details.tax_amount_after_discount_amount,
 			di_item.precision('fbr_di_further_tax'))
 
+		# FBR rounding error fix
+		if di_item.fbr_di_tax_rate:
+			calculated_taxable_value = flt(di_item.fbr_di_sales_tax / di_item.fbr_di_tax_rate * 100, di_item.precision('fbr_di_sales_tax'))
+			actual_taxable_value = di_item.fbr_di_retail_value if cint(item.apply_taxes_on_retail) else di_item.fbr_di_sale_value
+
+			if abs(calculated_taxable_value - actual_taxable_value) < 0.1:
+				if cint(item.apply_taxes_on_retail):
+					di_item.fbr_di_retail_value = calculated_taxable_value
+				else:
+					di_item.fbr_di_sale_value = calculated_taxable_value
+
 		di_item.fbr_di_sales_tax_withheld = 0
 		di_item.fbr_di_fed_tax = 0
 

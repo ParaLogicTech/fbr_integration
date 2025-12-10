@@ -74,14 +74,7 @@ def on_submit_fbr_di_invoice(invoice, method=None):
 	if invoice.get("fbr_di_invoice_no") and invoice.amended_from:
 		return
 
-	ignore_connection_error = cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "ignore_connection_error_on_submit"))
-	post_fbr_di_invoice(invoice, ignore_connection_error=ignore_connection_error, auto_commit=True)
-	if frappe.flags.fbr_di_connection_error:
-		frappe.msgprint(_(
-			"FBR Digital Invoice Number could not be generated because of a connection error to the FBR Digital Invoicing Service.<br><br>"
-			"System will attempt to generate FBR Digital Invoice Number again in the background. "
-			"You can also retry manually by clicking the 'Sync FBR Digital Invoice' button."
-		), title=_("FBR Digital Invoicing Service Connection Failed"))
+	post_fbr_di_invoice(invoice, auto_commit=True)
 
 
 def determine_is_fbr_di(invoice):
@@ -306,7 +299,7 @@ def get_invoice_data(invoice):
 	return invoice_data
 
 
-def post_fbr_di_invoice(invoice, ignore_connection_error=False, auto_commit=True):
+def post_fbr_di_invoice(invoice, auto_commit=True):
 	if not check_fbr_di_enabled():
 		return
 	if not invoice.meta.has_field('is_fbr_di_invoice'):
@@ -321,7 +314,7 @@ def post_fbr_di_invoice(invoice, ignore_connection_error=False, auto_commit=True
 	invoice_data = get_invoice_data(invoice)
 	json_data = json.dumps(invoice_data)
 
-	invoice_number = push_invoice_data(invoice_data, invoice.name, ignore_connection_error=ignore_connection_error)
+	invoice_number = push_invoice_data(invoice_data, invoice.name)
 
 	if invoice_number:
 		qrcode_svg = get_invoice_qrcode_svg(invoice_number)
@@ -339,7 +332,7 @@ def post_fbr_di_invoice(invoice, ignore_connection_error=False, auto_commit=True
 	return invoice_number
 
 
-def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
+def push_invoice_data(data, sales_invoice):
 	invoice_number = None
 
 	fbr_di_settings = frappe.get_cached_doc("FBR Digital Invoicing Settings", None)
@@ -415,20 +408,16 @@ def push_invoice_data(data, sales_invoice, ignore_connection_error=False):
 	except requests.exceptions.ConnectionError as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
 			error_type="Connection Error")
-		frappe.flags.fbr_di_connection_error = True
-		if not ignore_connection_error:
-			frappe.throw(_("Could not connect to <b>FBR Digital Invoicing Service</b>:<br>{0}").format(
-				err
-			), exc=FBRConnectionError)
+		frappe.throw(_("Could not connect to <b>FBR Digital Invoicing Service</b>:<br>{0}").format(
+			err
+		), exc=FBRConnectionError)
 
 	except requests.exceptions.Timeout as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
 			error_type="Connection Timeout")
-		frappe.flags.fbr_di_connection_error = True
-		if not ignore_connection_error:
-			frappe.throw(_("Connection to <b>FBR Digital Invoicing Service</b> timed out:<br>{0}").format(
-				err
-			), exc=FBRConnectionError)
+		frappe.throw(_("Connection to <b>FBR Digital Invoicing Service</b> timed out:<br>{0}").format(
+			err
+		), exc=FBRConnectionError)
 
 	except requests.exceptions.HTTPError as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
@@ -579,7 +568,7 @@ def sync_fbr_di_invoice(sales_invoice):
 	invoice = frappe.get_doc("Sales Invoice", sales_invoice)
 	invoice.check_permission("submit")
 
-	invoice_number = post_fbr_di_invoice(invoice, ignore_connection_error=False, auto_commit=True)
+	invoice_number = post_fbr_di_invoice(invoice, auto_commit=True)
 	if invoice_number:
 		frappe.msgprint(_("FBR Digital Invoice Number {0} generated for Sales Invoice {1}")
 			.format(frappe.bold(invoice_number), invoice.name))
@@ -606,7 +595,7 @@ def post_fbr_di_invoices_without_number():
 	for name in failed_invoices:
 		invoice = frappe.get_doc("Sales Invoice", name)
 		try:
-			post_fbr_di_invoice(invoice, ignore_connection_error=False, auto_commit=True)
+			post_fbr_di_invoice(invoice, auto_commit=True)
 		except FBRRequestError:
 			frappe.db.rollback()
 		except Exception:

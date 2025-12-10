@@ -6,8 +6,6 @@
  "engine": "InnoDB",
  "field_order": [
   "enable_fbr_di",
-  "section_break_2",
-  "ignore_connection_error_on_submit",
   "use_sandbox",
   "column_break_3",
   "security_token"
@@ -18,17 +16,6 @@
    "fieldname": "enable_fbr_di",
    "fieldtype": "Check",
    "label": "Enable FBR Digital Invoicing Integration"
-  },
-  {
-   "fieldname": "section_break_2",
-   "fieldtype": "Section Break"
-  },
-  {
-   "default": "0",
-   "description": "If a connection error, invoice will be submitted without an FBR DI Invoice Number. The system will attempt to post invoice data and assign invoice number for failed FBR DI Invoices every hour.",
-   "fieldname": "ignore_connection_error_on_submit",
-   "fieldtype": "Check",
-   "label": "Ignore Connection Error to FBR Digital Invoicing Service on Submit"
   },
   {
    "fieldname": "column_break_3",
@@ -49,7 +36,7 @@
  "grid_page_length": 500,
  "issingle": 1,
  "links": [],
- "modified": "2025-09-05 15:15:33.391018",
+ "modified": "2025-12-09 00:44:07.926339",
  "modified_by": "Administrator",
  "module": "FBR Integration",
  "name": "FBR Digital Invoicing Settings",

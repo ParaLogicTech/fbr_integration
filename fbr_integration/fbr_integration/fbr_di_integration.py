@@ -75,7 +75,8 @@ def on_submit_fbr_di_invoice(invoice, method=None):
 	if invoice.get("fbr_di_invoice_no") and invoice.amended_from:
 		return
 
-	post_fbr_di_invoice(invoice, auto_commit=True)
+	validate_fbr_di_invoice_data(invoice)
+	_sync_fbr_di_invoice.enqueue(sales_invoice=invoice.name, ignore_permissions=True, enqueue_after_commit=True)
 
 
 def determine_is_fbr_di(invoice):
@@ -300,22 +301,34 @@ def get_invoice_data(invoice):
 	return invoice_data
 
 
-def post_fbr_di_invoice(invoice, auto_commit=True):
+def validate_fbr_di_invoice_data(invoice):
 	if not check_fbr_di_enabled():
 		return
 	if not invoice.meta.has_field('is_fbr_di_invoice'):
 		return
 	if not cint(invoice.get('is_fbr_di_invoice')):
 		return
+
+	invoice_data = get_invoice_data(invoice)
+	push_invoice_data(invoice_data, invoice.name, for_validate=True)
+
+
+def post_fbr_di_invoice_data(invoice, auto_commit=True):
+	if not check_fbr_di_enabled():
+		return None
+	if not invoice.meta.has_field('is_fbr_di_invoice'):
+		return None
+	if not cint(invoice.get('is_fbr_di_invoice')):
+		return None
 	if invoice.docstatus != 1:
-		return
+		return None
 	if invoice.fbr_di_invoice_no:
-		return
+		return invoice.fbr_di_invoice_no
 
 	invoice_data = get_invoice_data(invoice)
 	json_data = json.dumps(invoice_data)
 
-	invoice_number = push_invoice_data(invoice_data, invoice.name)
+	invoice_number = push_invoice_data(invoice_data, invoice.name, for_validate=False)
 
 	if invoice_number:
 		qrcode_svg = get_invoice_qrcode_svg(invoice_number)
@@ -333,15 +346,21 @@ def post_fbr_di_invoice(invoice, auto_commit=True):
 	return invoice_number
 
 
-def push_invoice_data(data, sales_invoice):
+def push_invoice_data(data, sales_invoice, for_validate):
 	invoice_number = None
 
 	fbr_di_settings = frappe.get_cached_doc("FBR Digital Invoicing Settings", None)
 
 	if fbr_di_settings.use_sandbox:
-		url = "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb"
+		if for_validate:
+			url = "https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata_sb"
+		else:
+			url = "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb"
 	else:
-		url = "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata"
+		if for_validate:
+			url = "https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata"
+		else:
+			url = "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata"
 
 	headers = {"Content-Type": "application/json"}
 	if not fbr_di_settings.security_token:
@@ -351,7 +370,7 @@ def push_invoice_data(data, sales_invoice):
 	headers["Authorization"] = "Bearer {0}".format(security_token)
 
 	try:
-		r = requests.post(url, json=data, headers=headers, timeout=10)
+		r = requests.post(url, json=data, headers=headers, timeout=30 if for_validate else 120)
 		r.raise_for_status()
 
 		response_json = r.json()
@@ -365,8 +384,8 @@ def push_invoice_data(data, sales_invoice):
 		# Parent Level Error Message
 		if parent_error_message or parent_error_code:
 			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-				error_type="FBR DI Error")
-			frappe.throw(_("An error occurred while generating <b>FBR Digital Invoice</b>:<br>{0}").format(
+				error_type="FBR DI Error", for_validate=for_validate)
+			frappe.throw(_("An error occurred while processing <b>FBR Digital Invoice</b>:<br>{0}").format(
 				parent_error_message or parent_error_code
 			), exc=FBRResponseError)
 
@@ -380,62 +399,62 @@ def push_invoice_data(data, sales_invoice):
 
 			if child_error_message or child_error_code:
 				log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-					error_type="FBR DI Error")
-				frappe.throw(_("An error occurred while generating <b>FBR Digital Invoice</b>:<br>FBR DI Row #{0}: {1}").format(
+					error_type="FBR DI Error", for_validate=for_validate)
+				frappe.throw(_("An error occurred while processing <b>FBR Digital Invoice</b>:<br>FBR DI Row #{0}: {1}").format(
 					child_idx, child_error_message or child_error_code
 				), exc=FBRResponseError)
 
 			if child_status_code != '00':
 				log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-					error_type="Invalid Response Code")
-				frappe.throw(_("Received an invalid response while generating <b>FBR Digital Invoice</b> on FBR DI Row #{0}").format(
+					error_type="Invalid Response Code", for_validate=for_validate)
+				frappe.throw(_("Received an invalid response while processing <b>FBR Digital Invoice</b> on FBR DI Row #{0}").format(
 					child_idx
 				), exc=FBRResponseError)
 
 		# Parent Level Invalid Status Code
 		if parent_status_code != '00':
 			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-				error_type="Invalid Response Code")
-			frappe.throw(_("Received an invalid response while generating <b>FBR Digital Invoice</b>"),
+				error_type="Invalid Response Code", for_validate=for_validate)
+			frappe.throw(_("Received an invalid response while processing <b>FBR Digital Invoice</b>"),
 				exc=FBRResponseError)
 
 		# Missing Invoice Number
-		if not invoice_number or invoice_number == 'Not Available':
+		if not for_validate and not invoice_number or invoice_number == 'Not Available':
 			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-				error_type="Invoice Number Not Available")
+				error_type="Invoice Number Not Available", for_validate=for_validate)
 			frappe.throw(_("FBR Digital Invoice Number was not provided by <b>FBR Digital Invoicing Service</b>"),
 				exc=FBRResponseError)
 
 	except requests.exceptions.ConnectionError as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
-			error_type="Connection Error")
+			error_type="Connection Error", for_validate=for_validate)
 		frappe.throw(_("Could not connect to <b>FBR Digital Invoicing Service</b>:<br>{0}").format(
 			err
 		), exc=FBRConnectionError)
 
 	except requests.exceptions.Timeout as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
-			error_type="Connection Timeout")
+			error_type="Connection Timeout", for_validate=for_validate)
 		frappe.throw(_("Connection to <b>FBR Digital Invoicing Service</b> timed out:<br>{0}").format(
 			err
 		), exc=FBRConnectionError)
 
 	except requests.exceptions.HTTPError as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
-			error_type="HTTP Error")
+			error_type="HTTP Error", for_validate=for_validate)
 		frappe.throw(_("An HTTP error occurred while connecting to the <b>FBR Digital Invoicing Service</b>:<br>{0}").format(
 			err
 		), exc=FBRRequestError)
 
 	except requests.exceptions.RequestException as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
-			error_type="Request Error")
+			error_type="Request Error", for_validate=for_validate)
 		frappe.throw(_("Request to <b>FBR Digital Invoicing Service</b> failed:<br>{0}").format(
 			err
 		), exc=FBRRequestError)
 
 	else:
-		log_fbr_di_request("Completed", sales_invoice, data, invoice_number, r)
+		log_fbr_di_request("Completed", sales_invoice, data, invoice_number, r, for_validate=for_validate)
 
 	return invoice_number
 
@@ -574,7 +593,11 @@ def log_fbr_di_request(
 	invoice_number=None,
 	response=None,
 	error_type=None,
+	for_validate=False,
 ):
+	if for_validate:
+		return None
+
 	return log_fbr_request(
 		service="FBR DI",
 		status=status,
@@ -590,16 +613,24 @@ def log_fbr_di_request(
 def sync_fbr_di_invoice(sales_invoice):
 	check_fbr_di_enabled(throw=True)
 
-	invoice = frappe.get_doc("Sales Invoice", sales_invoice)
-	invoice.check_permission("submit")
-
-	invoice_number = post_fbr_di_invoice(invoice, auto_commit=True)
+	invoice_number = _sync_fbr_di_invoice(sales_invoice)
 	if invoice_number:
-		frappe.msgprint(_("FBR Digital Invoice Number {0} generated for Sales Invoice {1}")
-			.format(frappe.bold(invoice_number), invoice.name))
+		frappe.msgprint(_("FBR Digital Invoice Number {0} generated for Sales Invoice {1}").format(
+			frappe.bold(invoice_number), sales_invoice
+		))
 	else:
 		frappe.msgprint(_("FBR Digital Invoice Number could not be generated"))
 
+	return invoice_number
+
+
+@frappe.task(queue="long")
+def _sync_fbr_di_invoice(sales_invoice, ignore_permissions=False):
+	invoice = frappe.get_doc("Sales Invoice", sales_invoice, for_update=True)
+	if not ignore_permissions:
+		invoice.check_permission("submit")
+
+	invoice_number = post_fbr_di_invoice_data(invoice, auto_commit=True)
 	return invoice_number
 
 
@@ -613,16 +644,14 @@ def post_fbr_di_invoices_without_number():
 		from `tabSales Invoice`
 		where docstatus = 1 and is_fbr_di_invoice = 1 and (fbr_di_invoice_no = '' or fbr_di_invoice_no is null)
 		order by posting_date, posting_time, creation
-		limit 100
+		limit 10
 		for update
 	""")
 
 	for name in failed_invoices:
-		invoice = frappe.get_doc("Sales Invoice", name)
+		invoice = frappe.get_doc("Sales Invoice", name, for_update=True)
 		try:
-			post_fbr_di_invoice(invoice, auto_commit=True)
-		except FBRRequestError:
-			frappe.db.rollback()
+			post_fbr_di_invoice_data(invoice, auto_commit=True)
 		except Exception:
 			frappe.db.rollback()
 			frappe.log_error(

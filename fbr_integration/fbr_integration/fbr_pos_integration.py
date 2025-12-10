@@ -157,8 +157,6 @@ def post_fbr_pos_invoices_without_number():
 		invoice = frappe.get_doc("Sales Invoice", name)
 		try:
 			post_fbr_pos_invoice(invoice, ignore_connection_error=False, auto_commit=True)
-		except FBRRequestError:
-			frappe.db.rollback()
 		except Exception:
 			frappe.db.rollback()
 			frappe.log_error(message=frappe.get_traceback(), title=get_error_title(invoice.name),

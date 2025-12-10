@@ -447,7 +447,7 @@ def get_invoice_type_and_ref(invoice):
 
 		return 'Credit Note', invoice_ref_no
 	else:
-		return 'Sale Invoice', invoice.name
+		return 'Sale Invoice', frappe.utils.original_name(invoice)
 
 
 def get_item_sale_type(item):

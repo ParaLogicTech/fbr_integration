@@ -51,10 +51,11 @@ fixtures = [
 				"Sales Invoice-fbr_pos_details_tab",
 				"Sales Invoice-fbr_di_details_tab",
 
-				"Item Group-customs_tariff_number",
-
 				"UOM-fbr_uom",
-				"UOM-fbr_use_alt_uom",
+
+				"Customs Tariff Number-sec_fbr",
+				"Customs Tariff Number-fbr_convert_uom",
+				"Customs Tariff Number-fbr_use_alt_uom",
 
 				"Item Tax Template-sec_fbr",
 				"Item Tax Template-fbr_sales_tax_type",

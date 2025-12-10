@@ -209,7 +209,7 @@ def calculate_fbr_pos_values(invoice):
 
 		# Item/Transaction Type
 		pos_item.fbr_pos_invoice_type = get_item_invoice_type(item, invoice, as_str=True)
-		pos_item.fbr_pos_pct_code = get_item_hs_code(item)
+		pos_item.fbr_pos_pct_code = get_item_hs_code(item, invoice)
 
 		# Amounts
 		pos_item.fbr_pos_quantity = flt(item.qty, pos_item.precision('fbr_pos_quantity'))

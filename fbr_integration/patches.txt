@@ -1,5 +1,6 @@
 [pre_model_sync]
 fbr_integration.patches.move_fbr_pos_log_to_integration_request
+execute:frappe.delete_doc_if_exists("Custom Field", "UOM-fbr_use_alt_uom")
 
 
 [post_model_sync]

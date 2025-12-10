@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from erpnext.stock.get_item_details import get_customs_tariff_number
 import io
 import json
 
@@ -16,36 +17,18 @@ class FBRResponseError(FBRRequestError):
 	pass
 
 
-def get_item_hs_code(item):
-	if item.get("customs_tariff_number"):
-		return item.customs_tariff_number
-	elif item.item_code:
-		pct_code = frappe.get_cached_value("Item", item.item_code, "customs_tariff_number")
-		if pct_code:
-			return pct_code
-		else:
-			return get_item_group_hs_code(frappe.get_cached_value("Item", item.item_code, "item_group"))
-	else:
-		return ""
+def get_item_hs_code(row, invoice):
+	parent_dict = invoice.get_item_details_parent_args()
+	args = invoice.get_item_details_child_args(row, parent_dict)
+	item_doc = frappe.get_cached_doc("Item", row.item_code) if row.item_code else frappe._dict()
+	return get_customs_tariff_number(item_doc, args) or ""
 
 
-def get_item_group_hs_code(item_group):
-	current_item_group = item_group
-	while current_item_group:
-		item_group_doc = frappe.get_cached_doc("Item Group", current_item_group)
-		if item_group_doc.customs_tariff_number:
-			return item_group_doc.customs_tariff_number
-
-		current_item_group = item_group_doc.parent_item_group
-
-	return ""
-
-
-def get_item_tax_details(item, invoice, account):
+def get_item_tax_details(row, invoice, account):
 	if not account:
 		return frappe._dict()
 
-	taxes = invoice.get_taxes_for_item(item)
+	taxes = invoice.get_taxes_for_item(row)
 	tax_row = [d for d in taxes if d.account_head == account]
 
 	if not tax_row:

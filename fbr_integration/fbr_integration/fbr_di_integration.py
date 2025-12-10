@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import cint, flt, cstr, getdate, strip_html, clean_whitespace
+from erpnext.stock.doctype.item.item import convert_item_uom_for
 from fbr_integration.fbr_integration.utils import (
 	get_invoice_qrcode_svg,
 	log_fbr_request,
@@ -158,11 +159,11 @@ def calculate_fbr_di_values(invoice):
 
 		# Item Code / Type
 		di_item.fbr_di_item_name = item.item_name
-		di_item.fbr_di_hs_code = get_item_hs_code(item)
+		di_item.fbr_di_hs_code = get_item_hs_code(item, invoice)
 		di_item.fbr_di_sale_type = get_item_sale_type(item)
 
 		# Qty / Amounts
-		qty, uom = get_item_qty_and_uom(item)
+		qty, uom = get_item_qty_and_uom(item, di_item.fbr_di_hs_code)
 		di_item.fbr_di_quantity = flt(qty, di_item.precision('fbr_di_quantity'))
 		di_item.fbr_di_uom = uom
 		di_item.fbr_di_sale_value = flt(item.base_net_amount, di_item.precision('fbr_di_sale_value'))
@@ -459,21 +460,45 @@ def get_item_sale_type(item):
 		return "Goods at standard rate (default)"
 
 
-def get_item_qty_and_uom(item):
-	qty = flt(item.qty)
-	use_uom = item.uom
-	if not use_uom:
-		return qty, DEFAULT_UOM
+def get_item_qty_and_uom(item, customs_tariff_number):
+	if item.uom:
+		qty = flt(item.qty)
+		use_uom = item.uom
+	else:
+		qty = flt(item.stock_qty)
+		use_uom = flt(item.stock_uom)
 
-	uom_doc = frappe.get_cached_doc("UOM", use_uom)
-	if uom_doc.fbr_use_alt_uom:
-		qty = flt(item.alt_uom_qty)
-		alt_uom = item.alt_uom or item.uom
-		if alt_uom:
-			use_uom = alt_uom
-			uom_doc = frappe.get_cached_doc("UOM", use_uom)
+	if customs_tariff_number:
+		tariff_doc = frappe.get_cached_doc("Customs Tariff Number", customs_tariff_number)
 
-	return qty, uom_doc.fbr_uom or DEFAULT_UOM
+		if tariff_doc.fbr_convert_uom and item.item_code:
+			converted_qty = convert_item_uom_for(
+				qty,
+				item.item_code,
+				from_uom=use_uom,
+				to_uom=tariff_doc.fbr_convert_uom,
+				null_if_not_convertible=True,
+			)
+
+			if converted_qty is not None:
+				qty = converted_qty
+				use_uom = tariff_doc.fbr_convert_uom
+			else:
+				frappe.msgprint(_("FBR Digital Invoice Item Row #{0}: Cannot convert UOM from {1} to {2}. Please configure Conversion Factor in {3}").format(
+					item.idx,
+					frappe.bold(use_uom),
+					frappe.bold(tariff_doc.fbr_convert_uom),
+					frappe.get_desk_link("Item", item.item_code),
+				), raise_exception=item.docstatus == 1)
+
+		elif tariff_doc.fbr_use_alt_uom:
+			qty = flt(item.alt_uom_qty)
+			alt_uom = item.alt_uom or use_uom
+			if alt_uom:
+				use_uom = alt_uom
+
+	fbr_uom = frappe.get_cached_value("UOM", use_uom, "fbr_uom")
+	return qty, fbr_uom or DEFAULT_UOM
 
 
 def get_province_from_address(address):

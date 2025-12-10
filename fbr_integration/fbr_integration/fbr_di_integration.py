@@ -142,8 +142,8 @@ def calculate_fbr_di_values(invoice):
 
 	invoice.fbr_di_buyer_registration_type = "Registered" if invoice.tax_strn else "Unregistered"
 
-	invoice.fbr_di_seller_province = get_province_from_address(invoice.customer_address)
-	invoice.fbr_di_buyer_province = get_province_from_address(invoice.company_address)
+	invoice.fbr_di_seller_province = get_province_from_address(invoice.company_address)
+	invoice.fbr_di_buyer_province = get_province_from_address(invoice.customer_address)
 
 	# Create Item Row ID Map
 	item_map = {}

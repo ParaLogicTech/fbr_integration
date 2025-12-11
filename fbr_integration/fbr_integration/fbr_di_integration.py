@@ -75,8 +75,16 @@ def on_submit_fbr_di_invoice(invoice, method=None):
 	if invoice.get("fbr_di_invoice_no") and invoice.amended_from:
 		return
 
-	validate_fbr_di_invoice_data(invoice)
-	_sync_fbr_di_invoice.enqueue(sales_invoice=invoice.name, ignore_permissions=True, enqueue_after_commit=True)
+	post_in_background = cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "post_in_background"))
+	if is_fbr_di_paused():
+		post_in_background = True
+
+	if post_in_background:
+		validate_fbr_di_invoice_data(invoice)
+		if not is_fbr_di_paused():
+			_sync_fbr_di_invoice.enqueue(sales_invoice=invoice.name, ignore_permissions=True, enqueue_after_commit=True)
+	else:
+		post_fbr_di_invoice_data(invoice, auto_commit=True)
 
 
 def determine_is_fbr_di(invoice):
@@ -100,6 +108,10 @@ def check_fbr_di_enabled(throw=False):
 		return False
 
 	return True
+
+
+def is_fbr_di_paused():
+	return cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "pause_posting"))
 
 
 def validate_is_fbr_di(invoice):
@@ -301,7 +313,7 @@ def get_invoice_data(invoice):
 	return invoice_data
 
 
-def validate_fbr_di_invoice_data(invoice):
+def validate_fbr_di_invoice_data(invoice, method=None):
 	if not check_fbr_di_enabled():
 		return
 	if not invoice.meta.has_field('is_fbr_di_invoice'):
@@ -320,10 +332,12 @@ def post_fbr_di_invoice_data(invoice, auto_commit=True):
 		return None
 	if not cint(invoice.get('is_fbr_di_invoice')):
 		return None
-	if invoice.docstatus != 1:
-		return None
 	if invoice.fbr_di_invoice_no:
 		return invoice.fbr_di_invoice_no
+	if invoice.docstatus != 1:
+		return None
+	if is_fbr_di_paused():
+		return None
 
 	invoice_data = get_invoice_data(invoice)
 	json_data = json.dumps(invoice_data)
@@ -370,7 +384,7 @@ def push_invoice_data(data, sales_invoice, for_validate):
 	headers["Authorization"] = "Bearer {0}".format(security_token)
 
 	try:
-		r = requests.post(url, json=data, headers=headers, timeout=30 if for_validate else 120)
+		r = requests.post(url, json=data, headers=headers, timeout=60 if for_validate else 120)
 		r.raise_for_status()
 
 		response_json = r.json()
@@ -613,6 +627,10 @@ def log_fbr_di_request(
 def sync_fbr_di_invoice(sales_invoice):
 	check_fbr_di_enabled(throw=True)
 
+	if is_fbr_di_paused():
+		frappe.msgprint(_("FBR Digital Invoicing is paused. Please contact your System Administrator"))
+		return None
+
 	invoice_number = _sync_fbr_di_invoice(sales_invoice)
 	if invoice_number:
 		frappe.msgprint(_("FBR Digital Invoice Number {0} generated for Sales Invoice {1}").format(
@@ -638,8 +656,10 @@ def _sync_fbr_di_invoice(sales_invoice, ignore_permissions=False):
 def post_fbr_di_invoices_without_number():
 	if not check_fbr_di_enabled():
 		return
+	if is_fbr_di_paused():
+		return
 
-	failed_invoices = frappe.db.sql_list("""
+	pending_invoices = frappe.db.sql_list("""
 		select name
 		from `tabSales Invoice`
 		where docstatus = 1 and is_fbr_di_invoice = 1 and (fbr_di_invoice_no = '' or fbr_di_invoice_no is null)
@@ -648,7 +668,7 @@ def post_fbr_di_invoices_without_number():
 		for update
 	""")
 
-	for name in failed_invoices:
+	for name in pending_invoices:
 		invoice = frappe.get_doc("Sales Invoice", name, for_update=True)
 		try:
 			post_fbr_di_invoice_data(invoice, auto_commit=True)

@@ -6,6 +6,8 @@
  "engine": "InnoDB",
  "field_order": [
   "enable_fbr_di",
+  "post_in_background",
+  "pause_posting",
   "use_sandbox",
   "column_break_3",
   "security_token"
@@ -24,19 +26,32 @@
   {
    "fieldname": "security_token",
    "fieldtype": "Password",
-   "label": "Security Token"
+   "label": "Security Token",
+   "mandatory_depends_on": "enable_fbr_di"
   },
   {
    "default": "0",
    "fieldname": "use_sandbox",
    "fieldtype": "Check",
    "label": "Use Sandbox"
+  },
+  {
+   "default": "0",
+   "fieldname": "post_in_background",
+   "fieldtype": "Check",
+   "label": "Post Invoices in Background"
+  },
+  {
+   "default": "0",
+   "fieldname": "pause_posting",
+   "fieldtype": "Check",
+   "label": "Pause Invoice Posting"
   }
  ],
  "grid_page_length": 500,
  "issingle": 1,
  "links": [],
- "modified": "2025-12-09 00:44:07.926339",
+ "modified": "2025-12-11 14:48:01.503750",
  "modified_by": "Administrator",
  "module": "FBR Integration",
  "name": "FBR Digital Invoicing Settings",

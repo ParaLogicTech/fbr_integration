@@ -17,6 +17,18 @@ import requests
 
 DEFAULT_UOM = "Numbers, pieces, units"
 
+di_item_sum_fields = [
+	"fbr_di_quantity",
+	"fbr_di_sale_value",
+	"fbr_di_retail_value",
+	"fbr_di_discount",
+	"fbr_di_sales_tax",
+	"fbr_di_extra_tax",
+	"fbr_di_further_tax",
+	"fbr_di_sales_tax_withheld",
+	"fbr_di_fed_tax",
+	"fbr_di_total_value",
+]
 
 def validate_fbr_di_invoice(invoice, method=None):
 	if not invoice.meta.has_field('is_fbr_di_invoice'):
@@ -142,20 +154,26 @@ def reset_values_for_not_fbr_di(invoice):
 
 
 def calculate_fbr_di_values(invoice):
+	invoice.fbr_di_invoice_type, invoice.fbr_di_invoice_ref_no = get_invoice_type_and_ref(invoice)
+	invoice.fbr_di_buyer_registration_type = "Registered" if invoice.tax_strn else "Unregistered"
+	invoice.fbr_di_seller_province = get_province_from_address(invoice.company_address)
+	invoice.fbr_di_buyer_province = get_province_from_address(invoice.customer_address)
+
+	# Items
+	make_fbr_di_items(invoice)
+	merge_fbr_di_items(invoice)
+	postprocess_fbr_di_items(invoice)
+
+
+def make_fbr_di_items(invoice):
 	sales_tax_account = frappe.get_cached_value('Company', invoice.company, "sales_tax_account")
 	extra_tax_account = frappe.get_cached_value('Company', invoice.company, "extra_tax_account")
 	further_tax_account = frappe.get_cached_value('Company', invoice.company, "further_tax_account")
 
 	if not sales_tax_account:
-		frappe.throw(_("Please set Sales Tax Account in {0} to calculate FBR Digital Invoice Data")
-			.format(frappe.get_desk_link("Company", invoice.company)))
-
-	invoice.fbr_di_invoice_type, invoice.fbr_di_invoice_ref_no = get_invoice_type_and_ref(invoice)
-
-	invoice.fbr_di_buyer_registration_type = "Registered" if invoice.tax_strn else "Unregistered"
-
-	invoice.fbr_di_seller_province = get_province_from_address(invoice.company_address)
-	invoice.fbr_di_buyer_province = get_province_from_address(invoice.customer_address)
+		frappe.throw(_("Please set Sales Tax Account in {0} to calculate FBR Digital Invoice Data").format(
+			frappe.get_desk_link("Company", invoice.company)
+		))
 
 	# Create Item Row ID Map
 	item_map = {}
@@ -166,7 +184,6 @@ def calculate_fbr_di_values(invoice):
 		if d.fbr_di_item_reference:
 			existing_di_item_map[d.fbr_di_item_reference] = d
 
-	# Items
 	invoice.fbr_di_items = []
 	for item in invoice.items:
 		existing_di_item = existing_di_item_map.get(item.name)
@@ -182,59 +199,35 @@ def calculate_fbr_di_values(invoice):
 
 		# Qty / Amounts
 		qty, uom = get_item_qty_and_uom(item, di_item.fbr_di_hs_code)
-		di_item.fbr_di_quantity = flt(qty, di_item.precision('fbr_di_quantity'))
+		di_item.fbr_di_quantity = flt(qty)
 		di_item.fbr_di_uom = uom
-		di_item.fbr_di_sale_value = flt(item.base_net_amount, di_item.precision('fbr_di_sale_value'))
-		di_item.fbr_di_retail_value = flt(item.base_taxable_amount, di_item.precision('fbr_di_retail_value')) if cint(item.apply_taxes_on_retail) else 0
-		di_item.fbr_di_discount = flt(item.base_tax_exclusive_total_discount, di_item.precision('fbr_di_discount'))
+		di_item.fbr_di_sale_value = flt(item.base_net_amount)
+		di_item.fbr_di_retail_value = flt(item.base_taxable_amount) if cint(item.apply_taxes_on_retail) else 0
+		di_item.fbr_di_discount = flt(item.base_tax_exclusive_total_discount)
 
 		# Taxes
 		sales_tax_details = get_item_tax_details(item, invoice, sales_tax_account)
 		extra_tax_details = get_item_tax_details(item, invoice, extra_tax_account)
 		further_tax_details = get_item_tax_details(item, invoice, further_tax_account)
 
-		di_item.fbr_di_tax_rate = flt(sales_tax_details.rate,
-			di_item.precision('fbr_di_tax_rate'))
-		di_item.fbr_di_sales_tax = flt(sales_tax_details.tax_amount_after_discount_amount,
-			di_item.precision('fbr_di_sales_tax'))
-		di_item.fbr_di_extra_tax = flt(extra_tax_details.tax_amount_after_discount_amount,
-			di_item.precision('fbr_di_extra_tax'))
-		di_item.fbr_di_further_tax = flt(further_tax_details.tax_amount_after_discount_amount,
-			di_item.precision('fbr_di_further_tax'))
-
-		# FBR rounding error fix
-		if di_item.fbr_di_tax_rate:
-			calculated_taxable_value = flt(di_item.fbr_di_sales_tax / di_item.fbr_di_tax_rate * 100, di_item.precision('fbr_di_sales_tax'))
-			actual_taxable_value = di_item.fbr_di_retail_value if cint(item.apply_taxes_on_retail) else di_item.fbr_di_sale_value
-
-			if abs(calculated_taxable_value - actual_taxable_value) < 0.1:
-				if cint(item.apply_taxes_on_retail):
-					di_item.fbr_di_retail_value = calculated_taxable_value
-				else:
-					di_item.fbr_di_sale_value = calculated_taxable_value
+		di_item.fbr_di_tax_rate = flt(sales_tax_details.rate, di_item.precision('fbr_di_tax_rate'))
+		di_item.fbr_di_sales_tax = flt(sales_tax_details.tax_amount_after_discount_amount)
+		di_item.fbr_di_extra_tax = flt(extra_tax_details.tax_amount_after_discount_amount)
+		di_item.fbr_di_further_tax = flt(further_tax_details.tax_amount_after_discount_amount)
 
 		di_item.fbr_di_sales_tax_withheld = 0
 		di_item.fbr_di_fed_tax = 0
 
 		di_item.fbr_di_total_value = flt(
-			di_item.fbr_di_sale_value + di_item.fbr_di_sales_tax + di_item.fbr_di_further_tax,
-			di_item.precision('fbr_di_total_value')
+			di_item.fbr_di_sale_value + di_item.fbr_di_sales_tax + di_item.fbr_di_further_tax + di_item.fbr_di_extra_tax
 		)
 
 		# reverse sign for credit note
 		if invoice.is_return:
-			di_item.fbr_di_quantity *= -1
-			di_item.fbr_di_sale_value *= -1
-			di_item.fbr_di_retail_value *= -1
-			di_item.fbr_di_discount *= -1
-			di_item.fbr_di_sales_tax *= -1
-			di_item.fbr_di_extra_tax *= -1
-			di_item.fbr_di_further_tax *= -1
-			di_item.fbr_di_sales_tax_withheld *= -1
-			di_item.fbr_di_fed_tax *= -1
-			di_item.fbr_di_total_value *= -1
+			for f in di_item_sum_fields:
+				di_item.set(f, -1 * di_item.get(f))
 
-		# Additional
+		# SRO
 		di_item.fbr_di_sro_schedule_no = item.fbr_sro_schedule_no
 		di_item.fbr_di_sro_serial_no = item.fbr_sro_serial_no
 
@@ -250,6 +243,69 @@ def calculate_fbr_di_values(invoice):
 
 	for i, di_item in enumerate(invoice.fbr_di_items):
 		di_item.idx = i + 1
+
+
+def merge_fbr_di_items(invoice):
+	def get_group_key(it):
+		return (
+			cstr(it.fbr_di_hs_code),
+			cstr(it.fbr_di_item_name),
+			cstr(it.fbr_di_uom),
+			cstr(it.fbr_di_sale_type),
+			flt(it.fbr_di_tax_rate),
+			cstr(it.fbr_di_sro_schedule_no),
+			cstr(it.fbr_di_sro_serial_no),
+		)
+
+	group_item_data = {}
+
+	for di_item in invoice.fbr_di_items:
+		group_key = get_group_key(di_item)
+		group_item = group_item_data.setdefault(group_key, frappe._dict())
+		for f in di_item_sum_fields:
+			group_item[f] = group_item.get(f, 0) + flt(di_item.get(f))
+
+	duplicate_list = []
+	count = 0
+	for di_item in invoice.fbr_di_items:
+		group_key = get_group_key(di_item)
+		if group_key in group_item_data.keys():
+			count += 1
+			di_item.update(group_item_data[group_key])
+			di_item.idx = count
+			del group_item_data[group_key]
+		else:
+			duplicate_list.append(di_item)
+
+	for di_item in duplicate_list:
+		invoice.remove(di_item)
+
+
+def postprocess_fbr_di_items(invoice):
+	# Rounding
+	for di_item in invoice.fbr_di_items:
+		invoice.round_floats_in(di_item)
+
+	# FBR rounding error fix
+	for di_item in invoice.fbr_di_items:
+		if not di_item.fbr_di_tax_rate:
+			continue
+
+		is_3rd_schedule = di_item.fbr_di_sale_type == " 3rd Schedule Goods "
+
+		calculated_taxable_value = flt(di_item.fbr_di_sales_tax / di_item.fbr_di_tax_rate * 100, di_item.precision('fbr_di_sales_tax'))
+		actual_taxable_value = di_item.fbr_di_retail_value if is_3rd_schedule else di_item.fbr_di_sale_value
+
+		if abs(calculated_taxable_value - actual_taxable_value) < 0.1:
+			if is_3rd_schedule:
+				di_item.fbr_di_retail_value = calculated_taxable_value
+			else:
+				di_item.fbr_di_sale_value = calculated_taxable_value
+
+			di_item.fbr_di_total_value = flt(
+				di_item.fbr_di_sale_value + di_item.fbr_di_sales_tax + di_item.fbr_di_further_tax + di_item.fbr_di_extra_tax,
+				di_item.precision('fbr_di_total_value')
+			)
 
 
 def get_invoice_data(invoice):
@@ -281,7 +337,7 @@ def get_invoice_data(invoice):
 
 		item = invoice.getone('items', {'name': di_item.fbr_di_item_reference})
 		if not item:
-			frappe.throw(_("Could not find reference to line item FBR Digital Invoice Item Row #{0} Item Code {1}").format(di_item.idx, di_item.item_code))
+			frappe.throw(_("Could not find reference to line item FBR Digital Invoice Item Row #{0}").format(di_item.idx))
 
 		# Product Details
 		item_data.hsCode = di_item.fbr_di_hs_code

@@ -89,11 +89,16 @@ def on_submit_fbr_di_invoice(invoice, method=None):
 
 def determine_is_fbr_di(invoice):
 	enable_fbr_di = cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "enable_fbr_di"))
+	fbr_di_starting_date = frappe.get_cached_value("FBR Digital Invoicing Settings", None, "starting_date")
 
-	if enable_fbr_di and cint(invoice.get('has_stin')):
-		return 1
-	else:
+	if not enable_fbr_di:
 		return 0
+	if not cint(invoice.get('has_stin')):
+		return 0
+	if fbr_di_starting_date and getdate(invoice.posting_date) < getdate(fbr_di_starting_date):
+		return 0
+
+	return 1
 
 
 def check_fbr_di_enabled(throw=False):

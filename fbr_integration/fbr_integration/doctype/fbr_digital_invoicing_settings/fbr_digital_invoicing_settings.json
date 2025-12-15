@@ -10,7 +10,8 @@
   "pause_posting",
   "use_sandbox",
   "column_break_3",
-  "security_token"
+  "security_token",
+  "starting_date"
  ],
  "fields": [
   {
@@ -46,12 +47,17 @@
    "fieldname": "pause_posting",
    "fieldtype": "Check",
    "label": "Pause Invoice Posting"
+  },
+  {
+   "fieldname": "starting_date",
+   "fieldtype": "Date",
+   "label": "Starting Date for Digital Invoices"
   }
  ],
  "grid_page_length": 500,
  "issingle": 1,
  "links": [],
- "modified": "2025-12-11 14:48:01.503750",
+ "modified": "2025-12-15 16:41:54.091488",
  "modified_by": "Administrator",
  "module": "FBR Integration",
  "name": "FBR Digital Invoicing Settings",

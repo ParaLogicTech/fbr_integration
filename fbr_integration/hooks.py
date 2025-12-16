@@ -57,8 +57,9 @@ fixtures = [
 				"UOM-fbr_uom",
 
 				"Customs Tariff Number-sec_fbr",
+				"Customs Tariff Number-fbr_qty_uom",
+				"Customs Tariff Number-fbr_cb_1",
 				"Customs Tariff Number-fbr_convert_uom",
-				"Customs Tariff Number-fbr_use_alt_uom",
 
 				"Item Tax Template-sec_fbr",
 				"Item Tax Template-fbr_sales_tax_type",

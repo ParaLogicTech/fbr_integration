@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, cstr, getdate, strip_html, clean_whitespace
 from erpnext.stock.doctype.item.item import convert_item_uom_for
+from erpnext.setup.doctype.uom_conversion_factor.uom_conversion_factor import get_uom_conv_factor
 from fbr_integration.fbr_integration.utils import (
 	get_invoice_qrcode_svg,
 	log_fbr_request,
@@ -562,37 +563,82 @@ def get_item_qty_and_uom(item, customs_tariff_number):
 		qty = flt(item.stock_qty)
 		use_uom = flt(item.stock_uom)
 
+	validate_conversion = item.docstatus == 1
+
 	if customs_tariff_number:
 		tariff_doc = frappe.get_cached_doc("Customs Tariff Number", customs_tariff_number)
 
-		if tariff_doc.fbr_convert_uom and item.item_code:
-			converted_qty = convert_item_uom_for(
+		if tariff_doc.fbr_qty_uom == "Convert to UOM" and tariff_doc.fbr_convert_uom:
+			qty, use_uom = convert_uom(
 				qty,
-				item.item_code,
-				from_uom=use_uom,
-				to_uom=tariff_doc.fbr_convert_uom,
-				null_if_not_convertible=True,
+				use_uom,
+				tariff_doc.fbr_convert_uom,
+				item.idx,
+				item_code=item.item_code,
+				throw=validate_conversion,
 			)
 
-			if converted_qty is not None:
-				qty = converted_qty
-				use_uom = tariff_doc.fbr_convert_uom
-			else:
-				frappe.msgprint(_("FBR Digital Invoice Item Row #{0}: Cannot convert UOM from {1} to {2}. Please configure Conversion Factor in {3}").format(
-					item.idx,
-					frappe.bold(use_uom),
-					frappe.bold(tariff_doc.fbr_convert_uom),
-					frappe.get_desk_link("Item", item.item_code),
-				), raise_exception=item.docstatus == 1)
-
-		elif tariff_doc.fbr_use_alt_uom:
+		elif tariff_doc.fbr_qty_uom == "Contents UOM":
 			qty = flt(item.alt_uom_qty)
-			alt_uom = item.alt_uom or use_uom
-			if alt_uom:
-				use_uom = alt_uom
+			use_uom = item.alt_uom or use_uom
+
+		elif tariff_doc.fbr_qty_uom == "Stock UOM":
+			qty = flt(item.stock_qty)
+			use_uom = item.stock_uom or use_uom
+
+		elif tariff_doc.fbr_qty_uom == "Net Weight":
+			if flt(item.net_weight) and item.weight_uom:
+				if tariff_doc.fbr_convert_uom:
+					qty, use_uom = convert_uom(item.net_weight, item.weight_uom, tariff_doc.fbr_convert_uom, item.idx, throw=validate_conversion)
+				else:
+					qty = flt(item.net_weight)
+					use_uom = item.weight_uom or use_uom
+			else:
+				frappe.msgprint(_("FBR Digital Invoice Item Row #{0}: Net Weight is zero or Weight UOM is missing").format(
+					item.idx,
+				), raise_exception=validate_conversion)
+
+		elif tariff_doc.fbr_qty_uom == "Gross Weight":
+			pass
 
 	fbr_uom = frappe.get_cached_value("UOM", use_uom, "fbr_uom")
 	return qty, fbr_uom or DEFAULT_UOM
+
+
+def convert_uom(qty, from_uom, to_uom, idx, item_code=None, throw=False):
+	qty = flt(qty)
+
+	if item_code:
+		converted_qty = convert_item_uom_for(
+			qty,
+			item_code,
+			from_uom=from_uom,
+			to_uom=to_uom,
+			null_if_not_convertible=True,
+		)
+
+		if converted_qty is None:
+			frappe.msgprint(_("FBR Digital Invoice Item Row #{0}: Cannot convert UOM from {1} to {2}. Please configure Conversion Factor in {3}").format(
+				idx,
+				frappe.bold(from_uom),
+				frappe.bold(to_uom),
+				frappe.get_desk_link("Item", item_code),
+			), raise_exception=throw)
+
+			return qty, from_uom
+
+		return converted_qty, to_uom
+	else:
+		conversion_factor = get_uom_conv_factor(from_uom, to_uom)
+		if not conversion_factor:
+			frappe.msgprint(_("FBR Digital Invoice Item Row #{0}: Cannot convert UOM from {1} to {2}").format(
+				idx,
+				frappe.bold(from_uom),
+				frappe.bold(to_uom),
+			), raise_exception=throw)
+			return qty, from_uom
+
+		return qty * conversion_factor, to_uom
 
 
 def get_province_from_address(address):

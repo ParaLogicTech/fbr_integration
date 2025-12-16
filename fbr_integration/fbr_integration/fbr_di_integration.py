@@ -587,11 +587,12 @@ def get_item_qty_and_uom(item, customs_tariff_number):
 			use_uom = item.stock_uom or use_uom
 
 		elif tariff_doc.fbr_qty_uom == "Net Weight":
-			if flt(item.net_weight) and item.weight_uom:
+			if flt(item.get("net_weight")) and item.weight_uom:
 				if tariff_doc.fbr_convert_uom:
-					qty, use_uom = convert_uom(item.net_weight, item.weight_uom, tariff_doc.fbr_convert_uom, item.idx, throw=validate_conversion)
+					qty, use_uom = convert_uom(item.get("net_weight"), item.weight_uom, tariff_doc.fbr_convert_uom, item.idx,
+						throw=validate_conversion)
 				else:
-					qty = flt(item.net_weight)
+					qty = flt(item.get("net_weight"))
 					use_uom = item.weight_uom or use_uom
 			else:
 				frappe.msgprint(_("FBR Digital Invoice Item Row #{0}: Net Weight is zero or Weight UOM is missing").format(
@@ -599,7 +600,17 @@ def get_item_qty_and_uom(item, customs_tariff_number):
 				), raise_exception=validate_conversion)
 
 		elif tariff_doc.fbr_qty_uom == "Gross Weight":
-			pass
+			if flt(item.get("gross_weight")) and item.weight_uom:
+				if tariff_doc.fbr_convert_uom:
+					qty, use_uom = convert_uom(item.get("gross_weight"), item.weight_uom, tariff_doc.fbr_convert_uom, item.idx,
+						throw=validate_conversion)
+				else:
+					qty = flt(item.get("gross_weight"))
+					use_uom = item.weight_uom or use_uom
+			else:
+				frappe.msgprint(_("FBR Digital Invoice Item Row #{0}: Gross Weight is zero or Weight UOM is missing").format(
+					item.idx,
+				), raise_exception=validate_conversion)
 
 	fbr_uom = frappe.get_cached_value("UOM", use_uom, "fbr_uom")
 	return qty, fbr_uom or DEFAULT_UOM

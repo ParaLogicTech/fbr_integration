@@ -15,8 +15,6 @@ def execute():
 		"error": "error",
 	}
 
-	url = frappe.db.get_single_value("FBR POS Settings", "post_invoice_data_endpoint")
-
 	logs = frappe.db.sql("select * from `tabFBR POS Log` order by creation", as_dict=True)
 	with click.progressbar(logs) as data:
 		for log in data:
@@ -26,7 +24,6 @@ def execute():
 				doc.set(new_f, log.get(old_f))
 
 			doc.integration_request_service = "FBR POS"
-			doc.url = url
 
 			doc.status = "Failed" if log.log_type == "Error" else "Completed"
 

@@ -568,7 +568,7 @@ def get_item_qty_and_uom(item, customs_tariff_number):
 	if customs_tariff_number:
 		tariff_doc = frappe.get_cached_doc("Customs Tariff Number", customs_tariff_number)
 
-		if tariff_doc.fbr_qty_uom == "Convert to UOM" and tariff_doc.fbr_convert_uom:
+		if tariff_doc.fbr_qty_uom == "Convert to UOM Qty" and tariff_doc.fbr_convert_uom:
 			qty, use_uom = convert_uom(
 				qty,
 				use_uom,
@@ -578,11 +578,11 @@ def get_item_qty_and_uom(item, customs_tariff_number):
 				throw=validate_conversion,
 			)
 
-		elif tariff_doc.fbr_qty_uom == "Contents UOM":
+		elif tariff_doc.fbr_qty_uom == "Contents UOM Qty":
 			qty = flt(item.alt_uom_qty)
 			use_uom = item.alt_uom or use_uom
 
-		elif tariff_doc.fbr_qty_uom == "Stock UOM":
+		elif tariff_doc.fbr_qty_uom == "Stock UOM Qty":
 			qty = flt(item.stock_qty)
 			use_uom = item.stock_uom or use_uom
 

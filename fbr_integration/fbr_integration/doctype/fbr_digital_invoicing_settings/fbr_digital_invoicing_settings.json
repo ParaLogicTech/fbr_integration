@@ -7,11 +7,13 @@
  "field_order": [
   "enable_fbr_di",
   "post_in_background",
+  "is_realtime",
   "pause_posting",
   "use_sandbox",
   "column_break_3",
   "security_token",
-  "starting_date"
+  "starting_date",
+  "posting_role"
  ],
  "fields": [
   {
@@ -37,7 +39,7 @@
    "label": "Use Sandbox"
   },
   {
-   "default": "0",
+   "default": "1",
    "fieldname": "post_in_background",
    "fieldtype": "Check",
    "label": "Post Invoices in Background"
@@ -52,12 +54,24 @@
    "fieldname": "starting_date",
    "fieldtype": "Date",
    "label": "Starting Date for Digital Invoices"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_realtime",
+   "fieldtype": "Check",
+   "label": "Post Invoices in Real Time"
+  },
+  {
+   "fieldname": "posting_role",
+   "fieldtype": "Link",
+   "label": "Restrict Manual Posting to Role",
+   "options": "Role"
   }
  ],
  "grid_page_length": 500,
  "issingle": 1,
  "links": [],
- "modified": "2025-12-15 16:41:54.091488",
+ "modified": "2026-01-09 17:27:54.116405",
  "modified_by": "Administrator",
  "module": "FBR Integration",
  "name": "FBR Digital Invoicing Settings",

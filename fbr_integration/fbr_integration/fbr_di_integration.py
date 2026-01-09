@@ -89,12 +89,12 @@ def on_submit_fbr_di_invoice(invoice, method=None):
 		return
 
 	post_in_background = cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "post_in_background"))
-	if is_fbr_di_paused():
+	if not is_fbr_di_realtime():
 		post_in_background = True
 
 	if post_in_background:
 		validate_fbr_di_invoice_data(invoice)
-		if not is_fbr_di_paused():
+		if is_fbr_di_realtime():
 			_sync_fbr_di_invoice.enqueue(sales_invoice=invoice.name, ignore_permissions=True, enqueue_after_commit=True)
 	else:
 		post_fbr_di_invoice_data(invoice, auto_commit=True)
@@ -126,6 +126,13 @@ def check_fbr_di_enabled(throw=False):
 		return False
 
 	return True
+
+
+def is_fbr_di_realtime():
+	if is_fbr_di_paused():
+		return False
+
+	return cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "is_realtime"))
 
 
 def is_fbr_di_paused():
@@ -764,15 +771,25 @@ def sync_fbr_di_invoice(sales_invoice):
 def _sync_fbr_di_invoice(sales_invoice, ignore_permissions=False):
 	invoice = frappe.get_doc("Sales Invoice", sales_invoice, for_update=True)
 	if not ignore_permissions:
-		invoice.check_permission("submit")
+		check_fbr_di_posting_permission(invoice)
 
 	invoice_number = post_fbr_di_invoice_data(invoice, auto_commit=True)
 	return invoice_number
 
 
+def check_fbr_di_posting_permission(invoice):
+	invoice.check_permission("submit")
+
+	posting_role = frappe.get_cached_value("FBR Digital Invoicing Settings", None, "posting_role")
+	if posting_role and posting_role not in frappe.get_roles():
+		frappe.throw(_("You do not have permission to post FBR Digital Invoice"))
+
+
 # called by scheduler
 def post_fbr_di_invoices_without_number():
 	if not check_fbr_di_enabled():
+		return
+	if not is_fbr_di_realtime():
 		return
 	if is_fbr_di_paused():
 		return

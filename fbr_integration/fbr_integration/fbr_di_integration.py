@@ -140,7 +140,15 @@ def is_fbr_di_paused():
 
 
 def validate_is_fbr_di(invoice):
-	pass
+	for di_item in invoice.fbr_di_items:
+		item = invoice.getone('items', {'name': di_item.fbr_di_item_reference})
+		if not item:
+			continue
+
+		if not di_item.fbr_di_hs_code:
+			frappe.msgprint(_("Row #{0}: Could not determine HS Code for FBR Digital Invoicing for Item {1}").format(
+				item.idx, frappe.bold(item.item_code)
+			), raise_exception=invoice.docstatus == 1)
 
 
 def reset_values_for_draft_invoice(invoice):

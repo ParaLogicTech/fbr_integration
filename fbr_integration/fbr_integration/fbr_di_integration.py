@@ -702,6 +702,9 @@ def get_sandbox_scenario_id(data, invoice):
 		else:
 			return "SN005"
 
+	elif any(d.get("saleType") == "Electric Vehicle" for d in data.get("items")):
+		return "SN020"
+
 	elif any(d.get("saleType") == "Goods at standard rate (default)" for d in data.get("items")):
 		if invoice.get("is_pos"):
 			return "SN026"

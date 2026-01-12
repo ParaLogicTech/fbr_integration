@@ -209,7 +209,7 @@ def make_fbr_di_items(invoice):
 		di_item.fbr_di_item_reference = item.name
 
 		# Item Code / Type
-		di_item.fbr_di_item_name = item.item_name
+		di_item.fbr_di_item_name = cstr(item.item_name).strip()
 		di_item.fbr_di_hs_code = get_item_hs_code(item, invoice)
 		di_item.fbr_di_sale_type = get_item_sale_type(item)
 

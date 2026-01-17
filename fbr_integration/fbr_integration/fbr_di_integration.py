@@ -65,6 +65,22 @@ def validate_fbr_di_invoice(invoice, method=None):
 		reset_values_for_not_fbr_di(invoice)
 
 
+@frappe.whitelist()
+def refresh_fbr_di_values(invoice):
+	if isinstance(invoice, str):
+		invoice = frappe.parse_json(invoice)
+
+	invoice = frappe.get_doc(invoice)
+
+	invoice.check_permission("write")
+	if invoice.docstatus != 0:
+		frappe.throw(_("Invoice is not in draft"))
+
+	invoice.run_method("validate_fbr_di_invoice")
+
+	return invoice
+
+
 def before_cancel_fbr_di_invoice(invoice, method=None):
 	if not invoice.meta.has_field('is_fbr_di_invoice'):
 		return
@@ -141,11 +157,11 @@ def is_fbr_di_paused():
 
 def validate_is_fbr_di(invoice):
 	for di_item in invoice.fbr_di_items:
-		item = invoice.getone('items', {'name': di_item.fbr_di_item_reference})
-		if not item:
-			continue
-
 		if not di_item.fbr_di_hs_code:
+			item = invoice.getone('items', {'name': di_item.fbr_di_item_reference})
+			if not item:
+				continue
+
 			frappe.msgprint(_("Row #{0}: Could not determine HS Code for FBR Digital Invoicing for Item {1}").format(
 				item.idx, frappe.bold(item.item_code)
 			), raise_exception=invoice.docstatus == 1)
@@ -263,15 +279,22 @@ def make_fbr_di_items(invoice):
 
 def merge_fbr_di_items(invoice):
 	def get_group_key(it):
-		return (
+		key = [
+			cstr(it.fbr_di_item_reference if not it.fbr_di_hs_code else ""),
 			cstr(it.fbr_di_hs_code),
-			cstr(it.fbr_di_item_name),
 			cstr(it.fbr_di_uom),
 			cstr(it.fbr_di_sale_type),
 			flt(it.fbr_di_tax_rate),
 			cstr(it.fbr_di_sro_schedule_no),
 			cstr(it.fbr_di_sro_serial_no),
-		)
+		]
+
+		if not merge_hs_codes:
+			key.append(cstr(it.fbr_di_item_name))
+
+		return tuple(key)
+
+	merge_hs_codes = cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "merge_hs_codes"))
 
 	group_item_data = {}
 
@@ -280,6 +303,9 @@ def merge_fbr_di_items(invoice):
 		group_item = group_item_data.setdefault(group_key, frappe._dict())
 		for f in di_item_sum_fields:
 			group_item[f] = group_item.get(f, 0) + flt(di_item.get(f))
+
+		if merge_hs_codes:
+			group_item["fbr_di_item_name"] = frappe.get_cached_value("Customs Tariff Number", di_item.fbr_di_hs_code, "description") or di_item.fbr_di_item_name
 
 	duplicate_list = []
 	count = 0

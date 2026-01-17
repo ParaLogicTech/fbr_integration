@@ -21,6 +21,9 @@ doc_events = {
 			"fbr_integration.fbr_integration.fbr_di_integration.before_cancel_fbr_di_invoice",
 			"fbr_integration.fbr_integration.fbr_pos_integration.before_cancel_fbr_pos_invoice",
 		],
+		"validate_fbr_di_invoice": [
+			"fbr_integration.fbr_integration.fbr_di_integration.validate_fbr_di_invoice",
+		],
 		"validate_fbr_di_invoice_data": [
 			"fbr_integration.fbr_integration.fbr_di_integration.validate_fbr_di_invoice_data",
 		],

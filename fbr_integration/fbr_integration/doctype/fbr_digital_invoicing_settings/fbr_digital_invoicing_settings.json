@@ -9,6 +9,7 @@
   "post_in_background",
   "is_realtime",
   "pause_posting",
+  "merge_hs_codes",
   "use_sandbox",
   "column_break_3",
   "security_token",
@@ -66,12 +67,18 @@
    "fieldtype": "Link",
    "label": "Restrict Manual Posting to Role",
    "options": "Role"
+  },
+  {
+   "default": "1",
+   "fieldname": "merge_hs_codes",
+   "fieldtype": "Check",
+   "label": "Merge HS Code Lines"
   }
  ],
  "grid_page_length": 500,
  "issingle": 1,
  "links": [],
- "modified": "2026-01-09 17:27:54.116405",
+ "modified": "2026-01-17 16:48:47.551536",
  "modified_by": "Administrator",
  "module": "FBR Integration",
  "name": "FBR Digital Invoicing Settings",

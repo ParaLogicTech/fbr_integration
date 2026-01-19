@@ -61,6 +61,9 @@ def log_fbr_request(
 	invoice_number=None,
 	response=None,
 	error_type=None,
+	existing_log=None,
+	auto_commit=False,
+	enqueue=False,
 ):
 	if isinstance(data, dict):
 		data = json.dumps(data)
@@ -69,7 +72,7 @@ def log_fbr_request(
 	if status == "Failed":
 		error = frappe.get_traceback()
 
-	frappe.enqueue(
+	return frappe.enqueue(
 		insert_request_log,
 		service=service,
 		status=status,
@@ -79,6 +82,9 @@ def log_fbr_request(
 		response_json=response.text if response else None,
 		error_type=error_type,
 		error=error,
+		existing_log=existing_log,
+		auto_commit=auto_commit,
+		now=not enqueue,
 	)
 
 
@@ -91,8 +97,14 @@ def insert_request_log(
 	response_json=None,
 	error=None,
 	error_type=None,
+	existing_log=None,
+	auto_commit=False,
 ):
-	log_doc = frappe.new_doc("Integration Request")
+	if existing_log:
+		log_doc = existing_log
+	else:
+		log_doc = frappe.new_doc("Integration Request")
+
 	log_doc.integration_request_service = service
 	log_doc.status = status
 
@@ -105,7 +117,12 @@ def insert_request_log(
 	log_doc.error = error or None
 	log_doc.request_description = error_type or None
 
-	log_doc.insert(ignore_permissions=True)
+	log_doc.save(ignore_permissions=True)
+
+	if auto_commit:
+		frappe.db.commit()
+
+	return log_doc
 
 
 def remove_fbr_fields(custom_fields_map):

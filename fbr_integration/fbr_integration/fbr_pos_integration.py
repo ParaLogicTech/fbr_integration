@@ -551,6 +551,8 @@ def log_fbr_pos_request(
 		invoice_number=invoice_number,
 		response=response,
 		error_type=error_type,
+		auto_commit=True,
+		enqueue=True,
 	)
 
 

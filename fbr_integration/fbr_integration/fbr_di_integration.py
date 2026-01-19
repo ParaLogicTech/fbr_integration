@@ -446,7 +446,7 @@ def post_fbr_di_invoice_data(invoice, auto_commit=True):
 	invoice_data = get_invoice_data(invoice)
 	json_data = json.dumps(invoice_data)
 
-	invoice_number = push_invoice_data(invoice_data, invoice.name, for_validate=False)
+	invoice_number = push_invoice_data(invoice_data, invoice.name, for_validate=False, auto_commit=auto_commit)
 
 	if invoice_number:
 		qrcode_svg = get_invoice_qrcode_svg(invoice_number)
@@ -464,7 +464,7 @@ def post_fbr_di_invoice_data(invoice, auto_commit=True):
 	return invoice_number
 
 
-def push_invoice_data(data, sales_invoice, for_validate):
+def push_invoice_data(data, sales_invoice, for_validate, auto_commit=False):
 	invoice_number = None
 
 	fbr_di_settings = frappe.get_cached_doc("FBR Digital Invoicing Settings", None)
@@ -487,6 +487,9 @@ def push_invoice_data(data, sales_invoice, for_validate):
 	security_token = fbr_di_settings.get_password("security_token")
 	headers["Authorization"] = "Bearer {0}".format(security_token)
 
+	log = log_fbr_di_request("Queued", sales_invoice, data, invoice_number,
+		for_validate=for_validate, auto_commit=auto_commit)
+
 	try:
 		r = requests.post(url, json=data, headers=headers, timeout=60 if for_validate else 120)
 		r.raise_for_status()
@@ -502,7 +505,7 @@ def push_invoice_data(data, sales_invoice, for_validate):
 		# Parent Level Error Message
 		if parent_error_message or parent_error_code:
 			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-				error_type="FBR DI Error", for_validate=for_validate)
+				error_type="FBR DI Error", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 			frappe.throw(_("An error occurred while processing <b>FBR Digital Invoice</b>:<br>{0}").format(
 				parent_error_message or parent_error_code
 			), exc=FBRResponseError)
@@ -517,14 +520,14 @@ def push_invoice_data(data, sales_invoice, for_validate):
 
 			if child_error_message or child_error_code:
 				log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-					error_type="FBR DI Error", for_validate=for_validate)
+					error_type="FBR DI Error", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 				frappe.throw(_("An error occurred while processing <b>FBR Digital Invoice</b>:<br>FBR DI Row #{0}: {1}").format(
 					child_idx, child_error_message or child_error_code
 				), exc=FBRResponseError)
 
 			if child_status_code != '00':
 				log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-					error_type="Invalid Response Code", for_validate=for_validate)
+					error_type="Invalid Response Code", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 				frappe.throw(_("Received an invalid response while processing <b>FBR Digital Invoice</b> on FBR DI Row #{0}").format(
 					child_idx
 				), exc=FBRResponseError)
@@ -532,47 +535,48 @@ def push_invoice_data(data, sales_invoice, for_validate):
 		# Parent Level Invalid Status Code
 		if parent_status_code != '00':
 			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-				error_type="Invalid Response Code", for_validate=for_validate)
+				error_type="Invalid Response Code", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 			frappe.throw(_("Received an invalid response while processing <b>FBR Digital Invoice</b>"),
 				exc=FBRResponseError)
 
 		# Missing Invoice Number
 		if not for_validate and not invoice_number or invoice_number == 'Not Available':
 			log_fbr_di_request("Failed", sales_invoice, data, invoice_number, r,
-				error_type="Invoice Number Not Available", for_validate=for_validate)
+				error_type="Invoice Number Not Available", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 			frappe.throw(_("FBR Digital Invoice Number was not provided by <b>FBR Digital Invoicing Service</b>"),
 				exc=FBRResponseError)
 
 	except requests.exceptions.ConnectionError as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
-			error_type="Connection Error", for_validate=for_validate)
+			error_type="Connection Error", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 		frappe.throw(_("Could not connect to <b>FBR Digital Invoicing Service</b>:<br>{0}").format(
 			err
 		), exc=FBRConnectionError)
 
 	except requests.exceptions.Timeout as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
-			error_type="Connection Timeout", for_validate=for_validate)
+			error_type="Connection Timeout", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 		frappe.throw(_("Connection to <b>FBR Digital Invoicing Service</b> timed out:<br>{0}").format(
 			err
 		), exc=FBRConnectionError)
 
 	except requests.exceptions.HTTPError as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
-			error_type="HTTP Error", for_validate=for_validate)
+			error_type="HTTP Error", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 		frappe.throw(_("An HTTP error occurred while connecting to the <b>FBR Digital Invoicing Service</b>:<br>{0}").format(
 			err
 		), exc=FBRRequestError)
 
 	except requests.exceptions.RequestException as err:
 		log_fbr_di_request("Failed", sales_invoice, data, invoice_number,
-			error_type="Request Error", for_validate=for_validate)
+			error_type="Request Error", for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 		frappe.throw(_("Request to <b>FBR Digital Invoicing Service</b> failed:<br>{0}").format(
 			err
 		), exc=FBRRequestError)
 
 	else:
-		log_fbr_di_request("Completed", sales_invoice, data, invoice_number, r, for_validate=for_validate)
+		log_fbr_di_request("Completed", sales_invoice, data, invoice_number, r,
+			for_validate=for_validate, existing_log=log, auto_commit=auto_commit)
 
 	return invoice_number
 
@@ -771,6 +775,8 @@ def log_fbr_di_request(
 	response=None,
 	error_type=None,
 	for_validate=False,
+	existing_log=None,
+	auto_commit=False,
 ):
 	if for_validate:
 		return None
@@ -783,6 +789,9 @@ def log_fbr_di_request(
 		invoice_number=invoice_number,
 		response=response,
 		error_type=error_type,
+		existing_log=existing_log,
+		auto_commit=auto_commit,
+		enqueue=False,
 	)
 
 

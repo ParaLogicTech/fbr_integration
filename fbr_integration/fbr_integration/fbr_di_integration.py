@@ -104,16 +104,10 @@ def on_submit_fbr_di_invoice(invoice, method=None):
 	if invoice.get("fbr_di_invoice_no") and invoice.amended_from:
 		return
 
-	post_in_background = cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "post_in_background"))
-	if not is_fbr_di_realtime():
-		post_in_background = True
-
-	if post_in_background:
+	if should_validate_on_submit():
 		validate_fbr_di_invoice_data(invoice)
-		if is_fbr_di_realtime():
-			_sync_fbr_di_invoice.enqueue(sales_invoice=invoice.name, ignore_permissions=True, enqueue_after_commit=True)
-	else:
-		post_fbr_di_invoice_data(invoice, auto_commit=True)
+	if is_fbr_di_realtime():
+		_sync_fbr_di_invoice.enqueue(sales_invoice=invoice.name, ignore_permissions=True, enqueue_after_commit=True)
 
 
 def determine_is_fbr_di(invoice):
@@ -144,6 +138,13 @@ def check_fbr_di_enabled(throw=False):
 	return True
 
 
+def should_validate_on_submit():
+	if is_fbr_di_realtime():
+		return True
+
+	return cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "validate_on_submit"))
+
+
 def is_fbr_di_realtime():
 	if is_fbr_di_paused():
 		return False
@@ -164,7 +165,7 @@ def validate_is_fbr_di(invoice):
 
 			frappe.msgprint(_("Row #{0}: Could not determine HS Code for FBR Digital Invoicing for Item {1}").format(
 				item.idx, frappe.bold(item.item_code)
-			), raise_exception=invoice.docstatus == 1)
+			), raise_exception=invoice.docstatus == 1 and should_validate_on_submit())
 
 
 def reset_values_for_draft_invoice(invoice):

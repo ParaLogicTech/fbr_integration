@@ -6,8 +6,8 @@
  "engine": "InnoDB",
  "field_order": [
   "enable_fbr_di",
-  "post_in_background",
   "is_realtime",
+  "validate_on_submit",
   "pause_posting",
   "merge_hs_codes",
   "use_sandbox",
@@ -40,12 +40,6 @@
    "label": "Use Sandbox"
   },
   {
-   "default": "1",
-   "fieldname": "post_in_background",
-   "fieldtype": "Check",
-   "label": "Post Invoices in Background"
-  },
-  {
    "default": "0",
    "fieldname": "pause_posting",
    "fieldtype": "Check",
@@ -73,12 +67,18 @@
    "fieldname": "merge_hs_codes",
    "fieldtype": "Check",
    "label": "Merge HS Code Lines"
+  },
+  {
+   "default": "1",
+   "fieldname": "validate_on_submit",
+   "fieldtype": "Check",
+   "label": "Validate Invoice before Submission"
   }
  ],
  "grid_page_length": 500,
  "issingle": 1,
  "links": [],
- "modified": "2026-01-17 16:48:47.551536",
+ "modified": "2026-01-19 19:01:17.317768",
  "modified_by": "Administrator",
  "module": "FBR Integration",
  "name": "FBR Digital Invoicing Settings",

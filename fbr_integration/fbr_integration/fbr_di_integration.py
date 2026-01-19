@@ -609,7 +609,7 @@ def get_item_qty_and_uom(item, customs_tariff_number):
 	if customs_tariff_number:
 		tariff_doc = frappe.get_cached_doc("Customs Tariff Number", customs_tariff_number)
 
-		if tariff_doc.fbr_qty_uom == "Convert to UOM Qty" and tariff_doc.fbr_convert_uom:
+		if tariff_doc.fbr_qty_uom == "Convert to UOM" and tariff_doc.fbr_convert_uom:
 			qty, use_uom = convert_uom(
 				qty,
 				use_uom,

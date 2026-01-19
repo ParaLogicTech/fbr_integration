@@ -34,6 +34,10 @@ doctype_js = {
 	"Sales Invoice": "overrides/sales_invoice_hooks.js",
 }
 
+override_doctype_dashboards = {
+	"Sales Invoice": "fbr_integration.fbr_integration.utils.override_sales_invoice_dashboard",
+}
+
 scheduler_events = {
 	"hourly_long": [
 		"fbr_integration.fbr_integration.fbr_di_integration.post_fbr_di_invoices_without_number",

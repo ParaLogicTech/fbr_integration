@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from frappe.utils import cint
 from erpnext.stock.get_item_details import get_customs_tariff_number
 import io
 import json
@@ -133,3 +134,27 @@ def remove_fbr_fields(custom_fields_map):
 			})
 			if custom_field_name:
 				frappe.delete_doc('Custom Field', custom_field_name, delete_permanently=True)
+
+
+def override_sales_invoice_dashboard(data):
+	data.setdefault("non_standard_fieldnames", {})
+	data["non_standard_fieldnames"]["Integration Request"] = "reference_docname"
+
+	enable_fbr_pos = cint(frappe.get_cached_value("FBR POS Settings", None, "enable_fbr_pos"))
+	enable_fbr_di = cint(frappe.get_cached_value("FBR Digital Invoicing Settings", None, "enable_fbr_di"))
+	if not enable_fbr_di and not enable_fbr_pos:
+		return data
+
+	items = ["Integration Request"]
+
+	reference_sec = [d for d in data["transactions"] if d.get("label") == _("Reference")]
+	reference_sec = reference_sec[0] if reference_sec else None
+	if reference_sec:
+		reference_sec["items"] += items
+	else:
+		data["transactions"].append({
+			"label": _("Reference"),
+			"items": items
+		})
+
+	return data

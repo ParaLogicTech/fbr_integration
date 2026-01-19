@@ -118,7 +118,7 @@ def insert_request_log(
 	log_doc.error = error or None
 	log_doc.request_description = error_type or None
 
-	log_doc.save(ignore_permissions=True)
+	log_doc.save(ignore_permissions=True, ignore_version=True)
 
 	if auto_commit:
 		frappe.db.commit()

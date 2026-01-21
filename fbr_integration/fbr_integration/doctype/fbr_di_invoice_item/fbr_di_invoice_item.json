@@ -43,7 +43,7 @@
   {
    "columns": 1,
    "fieldname": "fbr_di_item_name",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "in_list_view": 1,
    "label": "Product Description",
    "no_copy": 1,
@@ -228,7 +228,7 @@
  "grid_page_length": 500,
  "istable": 1,
  "links": [],
- "modified": "2025-12-05 17:21:36.615308",
+ "modified": "2026-01-21 13:35:55.608161",
  "modified_by": "Administrator",
  "module": "FBR Integration",
  "name": "FBR DI Invoice Item",

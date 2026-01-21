@@ -580,7 +580,7 @@
   "width": null
  },
  {
-  "allow_in_quick_entry": 0,
+  "allow_in_quick_entry": 1,
   "allow_on_submit": 0,
   "bold": 0,
   "collapsible": 0,
@@ -614,7 +614,7 @@
   "length": 0,
   "link_filters": null,
   "mandatory_depends_on": "eval:doc.fbr_qty_uom == \"Convert to UOM\"",
-  "modified": "2025-12-15 18:57:14.518302",
+  "modified": "2026-01-21 13:37:44.171323",
   "module": null,
   "name": "Customs Tariff Number-fbr_convert_uom",
   "no_copy": 0,
@@ -638,7 +638,7 @@
   "width": null
  },
  {
-  "allow_in_quick_entry": 0,
+  "allow_in_quick_entry": 1,
   "allow_on_submit": 0,
   "bold": 0,
   "collapsible": 0,
@@ -672,7 +672,7 @@
   "length": 0,
   "link_filters": null,
   "mandatory_depends_on": null,
-  "modified": "2025-12-15 18:46:49.953323",
+  "modified": "2026-01-21 13:37:46.021594",
   "module": null,
   "name": "Customs Tariff Number-fbr_qty_uom",
   "no_copy": 0,

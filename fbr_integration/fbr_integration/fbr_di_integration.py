@@ -306,7 +306,9 @@ def merge_fbr_di_items(invoice):
 			group_item[f] = group_item.get(f, 0) + flt(di_item.get(f))
 
 		if merge_hs_codes:
-			group_item["fbr_di_item_name"] = frappe.get_cached_value("Customs Tariff Number", di_item.fbr_di_hs_code, "description") or di_item.fbr_di_item_name
+			hs_code_description = frappe.get_cached_value("Customs Tariff Number", di_item.fbr_di_hs_code, "description")
+			hs_code_description = hs_code_description or di_item.fbr_di_item_name
+			group_item["fbr_di_item_name"] = hs_code_description
 
 	duplicate_list = []
 	count = 0
@@ -322,6 +324,16 @@ def merge_fbr_di_items(invoice):
 
 	for di_item in duplicate_list:
 		invoice.remove(di_item)
+
+	# handle same hscode/description
+	visit_count = {}
+	for di_item in invoice.fbr_di_items:
+		key = (cstr(di_item.fbr_di_hs_code), cstr(di_item.fbr_di_item_name))
+		if key in visit_count:
+			visit_count[key] += 1
+			di_item.fbr_di_item_name = f"{di_item.fbr_di_item_name} ({cstr(visit_count[key])})"
+		else:
+			visit_count[key] = 1
 
 
 def postprocess_fbr_di_items(invoice):

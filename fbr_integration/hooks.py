@@ -53,6 +53,10 @@ get_item_tax_template_details = [
 	"fbr_integration.overrides.item_details_hooks.get_item_tax_template_details_hook",
 ]
 
+additional_sales_invoice_no_fields = [
+	"fbr_di_invoice_no", "fbr_pos_invoice_no",
+]
+
 fixtures = [
 	{
 		"doctype": "Custom Field",

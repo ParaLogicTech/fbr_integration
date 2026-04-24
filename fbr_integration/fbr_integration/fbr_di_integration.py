@@ -121,6 +121,9 @@ def determine_is_fbr_di(invoice):
 	if fbr_di_starting_date and getdate(invoice.posting_date) < getdate(fbr_di_starting_date):
 		return 0
 
+	if cint(invoice.get('is_return')):
+		return 0
+
 	return 1
 
 

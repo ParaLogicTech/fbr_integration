@@ -31,6 +31,7 @@ di_item_sum_fields = [
 	"fbr_di_total_value",
 ]
 
+
 def validate_fbr_di_invoice(invoice, method=None):
 	if not invoice.meta.has_field('is_fbr_di_invoice'):
 		return
@@ -373,6 +374,7 @@ def get_invoice_data(invoice):
 	invoice_data.invoiceType = invoice.fbr_di_invoice_type
 	invoice_data.invoiceDate = cstr(getdate(invoice.posting_date))
 	invoice_data.invoiceRefNo = invoice.fbr_di_invoice_ref_no
+	invoice_data.sourceInvoiceNo = invoice.name
 
 	# Seller / Company Details
 	invoice_data.sellerNTNCNIC = format_ntn_cnic(ntn=frappe.get_cached_value("Company", invoice.company, "tax_id"))
@@ -604,7 +606,7 @@ def get_invoice_type_and_ref(invoice):
 
 		return 'Credit Note', invoice_ref_no
 	else:
-		return 'Sale Invoice', frappe.utils.original_name(invoice)
+		return 'Sale Invoice', None
 
 
 def get_item_sale_type(item):

@@ -7,3 +7,4 @@ execute:frappe.delete_doc_if_exists("Custom Field", "UOM-fbr_use_alt_uom")
 fbr_integration.patches.resetup_fbr_pos_fields
 fbr_integration.patches.hs_code_qty_uom_field
 fbr_integration.patches.resetup_fbr_di_fields
+fbr_integration.patches.clean_fbr_di_item_name

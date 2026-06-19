@@ -230,7 +230,7 @@ def make_fbr_di_items(invoice):
 		di_item.fbr_di_item_reference = item.name
 
 		# Item Code / Type
-		di_item.fbr_di_item_name = cstr(item.item_name).strip()
+		di_item.fbr_di_item_name = clean_string(item.item_name)
 		di_item.fbr_di_hs_code = get_item_hs_code(item, invoice)
 		di_item.fbr_di_sale_type = get_item_sale_type(item)
 
@@ -312,7 +312,7 @@ def merge_fbr_di_items(invoice):
 		if merge_hs_codes:
 			hs_code_description = frappe.get_cached_value("Customs Tariff Number", di_item.fbr_di_hs_code, "description")
 			hs_code_description = hs_code_description or di_item.fbr_di_item_name
-			group_item["fbr_di_item_name"] = hs_code_description
+			group_item["fbr_di_item_name"] = clean_string(hs_code_description)
 
 	duplicate_list = []
 	count = 0
@@ -774,14 +774,21 @@ def format_ntn_cnic(ntn=None, cnic=None):
 
 
 def format_address(address):
-	address = cstr(address)
-	address = address.replace("<br/>", " ")
-	address = address.replace("<br />", " ")
-	address = address.replace("<br>", " ")
-	address = address.replace("\n", " ")
-	address = address.replace("\r", " ")
-	address = strip_html(address)
-	return clean_whitespace(address)
+	return clean_string(address, remove_html=True)
+
+
+def clean_string(string, remove_html=False):
+	string = cstr(string)
+
+	string = string.replace("<br/>", " ")
+	string = string.replace("<br />", " ")
+	string = string.replace("<br>", " ")
+
+	if remove_html:
+		string = strip_html(string)
+
+	string = " ".join(string.splitlines())
+	return clean_whitespace(string)
 
 
 def log_fbr_di_request(

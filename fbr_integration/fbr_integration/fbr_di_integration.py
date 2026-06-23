@@ -881,7 +881,6 @@ def post_fbr_di_invoices_without_number():
 		except Exception:
 			frappe.db.rollback()
 			frappe.log_error(
-				message=frappe.get_traceback(),
 				title="FBR Digital Invoice {0} Failed".format(invoice.name),
 				reference_doctype="Sales Invoice",
 				reference_name=name

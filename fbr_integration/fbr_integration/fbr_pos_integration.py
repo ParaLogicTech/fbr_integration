@@ -159,8 +159,11 @@ def post_fbr_pos_invoices_without_number():
 			post_fbr_pos_invoice(invoice, ignore_connection_error=False, auto_commit=True)
 		except Exception:
 			frappe.db.rollback()
-			frappe.log_error(message=frappe.get_traceback(), title=get_error_title(invoice.name),
-				reference_doctype="Sales Invoice", reference_name=name)
+			frappe.log_error(
+				title=get_error_title(invoice.name),
+				reference_doctype="Sales Invoice",
+				reference_name=name,
+			)
 
 
 def calculate_fbr_pos_values(invoice):

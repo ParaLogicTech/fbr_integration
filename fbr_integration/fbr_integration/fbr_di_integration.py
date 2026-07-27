@@ -783,6 +783,7 @@ def clean_string(string, remove_html=False):
 	string = string.replace("<br/>", " ")
 	string = string.replace("<br />", " ")
 	string = string.replace("<br>", " ")
+	string = string.replace("\\", "/")
 
 	if remove_html:
 		string = strip_html(string)
